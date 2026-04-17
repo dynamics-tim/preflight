@@ -24,8 +24,9 @@ Each line in `.copilot/session-activity.jsonl` is a JSON object.
 **Rich** (helper scripts): `{"ts":"...","tool":"editFile","path":"src/utils.ts","args_summary":"..."}`
 **Boundaries**: `{"ts":"...","event":"session_start","cwd":"project-name"}` / `{"event":"session_end"}`
 
-If the log is missing, the session-logger hook needs to be installed:
-copy `references/hooks/session-logger.json` to `.github/hooks/`.
+If the log is missing, the session-logger hook needs to be installed.
+Run `@copilot-init` to scaffold it, or copy `references/hooks/session-logger.json`
+to `.github/hooks/`.
 
 ## Pattern Detection Heuristics
 

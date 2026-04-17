@@ -385,11 +385,92 @@ Use `ask_user` with a multi-select array:
 
 Adapt the `enum` and `default` arrays to only include agents relevant to the project's detected capabilities.
 
-#### Category 4: Hooks (optional — v2)
+#### Category 4: Session learning hooks
 
-If relevant, briefly mention: "Copilot hooks can enforce guardrails (e.g., blocking edits to generated files). This is an advanced feature — I'd recommend adding hooks later once your base setup is working well."
+**Recommend when** the project has at least some Copilot config already set up (instructions or agents). This is an advanced feature that benefits active Copilot users.
 
-Do NOT scaffold hooks in v1.
+Offer to install the session-logger hook, which enables the `@skill-extractor` agent to analyze session activity and generate reusable skills.
+
+File: `.github/hooks/session-logger.json`
+
+Use `ask_user` with a boolean:
+
+```json
+{
+  "message": "**Session learning** (.github/hooks/session-logger.json)\n\nThis hook logs Copilot tool calls to `.copilot/session-activity.jsonl` during each session. After a few sessions, you can invoke `@skill-extractor` to analyze your patterns and auto-generate reusable skills.\n\n- Adds <1ms per tool call (just appends a line)\n- Logs rotate automatically each session\n- Only prompts for review after sessions with 10+ tool calls\n\nRequires adding `.copilot/` to `.gitignore` (session logs are ephemeral).",
+  "requestedSchema": {
+    "properties": {
+      "install": {
+        "type": "boolean",
+        "title": "Install session-logger hook + .gitignore entry",
+        "default": false
+      }
+    },
+    "required": ["install"]
+  }
+}
+```
+
+Default to **false** — this is opt-in for power users.
+
+If the user accepts, create `.github/hooks/session-logger.json` with this content:
+
+```json
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      {
+        "event": "sessionStart",
+        "steps": [
+          {
+            "type": "command",
+            "command": {
+              "bash": "mkdir -p .copilot && [ -f .copilot/session-activity.jsonl ] && mv .copilot/session-activity.jsonl .copilot/session-activity.prev.jsonl 2>/dev/null; echo '{\"ts\":\"'$(date -u '+%Y-%m-%dT%H:%M:%SZ')'\",\"event\":\"session_start\",\"cwd\":\"'$(basename \"$PWD\")'\"}' >> .copilot/session-activity.jsonl && [ -f .copilot/pending-skill-review ] && echo '[skill-extractor] Previous session has unreviewed patterns — say \"review last session\" to extract skills.' >&2 || true",
+              "powershell": "if (-not (Test-Path .copilot)) { New-Item -ItemType Directory -Path .copilot -Force | Out-Null }; if (Test-Path .copilot/session-activity.jsonl) { Move-Item .copilot/session-activity.jsonl .copilot/session-activity.prev.jsonl -Force }; $ts = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ'); Add-Content -Path .copilot/session-activity.jsonl -Value ('{\"ts\":\"' + $ts + '\",\"event\":\"session_start\",\"cwd\":\"' + (Split-Path -Leaf (Get-Location)) + '\"}') -Encoding UTF8; if (Test-Path .copilot/pending-skill-review) { Write-Host '[skill-extractor] Previous session has unreviewed patterns - say \"review last session\" to extract skills.' }"
+            },
+            "timeoutSec": 5
+          }
+        ]
+      }
+    ],
+    "postToolUse": [
+      {
+        "event": "postToolUse",
+        "steps": [
+          {
+            "type": "command",
+            "command": {
+              "bash": "mkdir -p .copilot && echo '{\"ts\":\"'$(date -u '+%Y-%m-%dT%H:%M:%SZ')'\",\"tool\":\"'${COPILOT_TOOL_NAME:-unknown}'\"}' >> .copilot/session-activity.jsonl 2>/dev/null || true",
+              "powershell": "try { if (-not (Test-Path .copilot)) { New-Item -ItemType Directory -Path .copilot -Force | Out-Null }; $tool = if ($env:COPILOT_TOOL_NAME) { $env:COPILOT_TOOL_NAME } else { 'unknown' }; Add-Content -Path .copilot/session-activity.jsonl -Value ('{\"ts\":\"' + (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ') + '\",\"tool\":\"' + $tool + '\"}') -Encoding UTF8 } catch {}"
+            },
+            "timeoutSec": 5
+          }
+        ]
+      }
+    ],
+    "sessionEnd": [
+      {
+        "event": "sessionEnd",
+        "steps": [
+          {
+            "type": "command",
+            "command": {
+              "bash": "mkdir -p .copilot && echo '{\"ts\":\"'$(date -u '+%Y-%m-%dT%H:%M:%SZ')'\",\"event\":\"session_end\"}' >> .copilot/session-activity.jsonl && LC=$(wc -l < .copilot/session-activity.jsonl 2>/dev/null || echo 0) && [ \"$LC\" -ge 10 ] && echo 'review' > .copilot/pending-skill-review || true",
+              "powershell": "if (-not (Test-Path .copilot)) { New-Item -ItemType Directory -Path .copilot -Force | Out-Null }; Add-Content -Path .copilot/session-activity.jsonl -Value ('{\"ts\":\"' + (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ') + '\",\"event\":\"session_end\"}') -Encoding UTF8; $lc = (Get-Content .copilot/session-activity.jsonl -ErrorAction SilentlyContinue | Measure-Object -Line).Lines; if ($lc -ge 10) { Set-Content -Path .copilot/pending-skill-review -Value 'review' -Encoding UTF8 }"
+            },
+            "timeoutSec": 5
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Also append `.copilot/` to the project's `.gitignore` (create it if it doesn't exist).
+
+Add both files to the `managedFiles` array in `.copilot-init-state.json`.
 
 #### Category 5: MCP config (optional — v2)
 
