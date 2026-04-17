@@ -1,0 +1,77 @@
+{
+  "version": 1,
+  "hooks": {
+    "preToolUse": [
+      {
+        "event": "preToolUse",
+        "steps": [
+          {
+            "type": "gate",
+            "condition": {
+              "toolName": "editFile",
+              "pathGlob": "*.lock"
+            },
+            "action": "reject",
+            "message": "Lock files should not be edited directly. Update package.json and run the package manager instead."
+          }
+        ]
+      },
+      {
+        "event": "preToolUse",
+        "steps": [
+          {
+            "type": "gate",
+            "condition": {
+              "toolName": "editFile",
+              "pathGlob": "dist/**"
+            },
+            "action": "reject",
+            "message": "The dist/ directory contains build artifacts. Edit source files and rebuild instead."
+          }
+        ]
+      },
+      {
+        "event": "preToolUse",
+        "steps": [
+          {
+            "type": "gate",
+            "condition": {
+              "toolName": "runTerminalCommand",
+              "commandPattern": "rm -rf"
+            },
+            "action": "warn",
+            "message": "Destructive command detected: rm -rf. Confirm this is intentional."
+          }
+        ]
+      },
+      {
+        "event": "preToolUse",
+        "steps": [
+          {
+            "type": "gate",
+            "condition": {
+              "toolName": "runTerminalCommand",
+              "commandPattern": "DROP"
+            },
+            "action": "warn",
+            "message": "SQL DROP statement detected. Confirm this is intentional and not targeting production."
+          }
+        ]
+      },
+      {
+        "event": "preToolUse",
+        "steps": [
+          {
+            "type": "gate",
+            "condition": {
+              "toolName": "runTerminalCommand",
+              "commandPattern": "Remove-Item.*-Recurse.*-Force"
+            },
+            "action": "warn",
+            "message": "Destructive PowerShell command detected: Remove-Item -Recurse -Force. Confirm this is intentional."
+          }
+        ]
+      }
+    ]
+  }
+}

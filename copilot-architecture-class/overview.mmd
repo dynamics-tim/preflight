@@ -1,0 +1,76 @@
+flowchart TD
+    User([🧑 User])
+
+    User --> Interface
+
+    subgraph Interface["Entry Points"]
+        CLI["Copilot CLI"]
+        IDE["VS Code / IDE"]
+    end
+
+    Interface --> LLM["🤖 AI Model (LLM)"]
+
+    subgraph Context["Layer 1: Context & Instructions"]
+        RepoInstr["copilot-instructions.md<br/>(repo-wide)"]
+        PathInstr["*.instructions.md<br/>(path-scoped)"]
+        PersonalInstr["~/.copilot/copilot-instructions.md<br/>(personal)"]
+        AgentsMD["AGENTS.md<br/>(agentic defaults)"]
+    end
+
+    subgraph Skills["Layer 1b: Skills"]
+        SkillDef["SKILL.md definitions"]
+        SkillPersonal["~/.copilot/skills/"]
+        SkillRepo[".github/skills/"]
+    end
+
+    Context --> LLM
+    Skills --> LLM
+
+    subgraph Tools["Layer 2: Tools & Capabilities"]
+        direction LR
+        BuiltIn["Built-in Tools<br/>read · edit · grep · glob<br/>shell · web_fetch · sql"]
+        MCP["MCP Server Tools<br/>mcp-config.json / .mcp.json<br/>External APIs & services"]
+    end
+
+    LLM <--> Tools
+
+    subgraph Agents["Layer 3: Agent System"]
+        MainAgent["Main Agent"]
+        SubAgents["Sub-agents<br/>(explore · task · general-purpose<br/>code-review)"]
+        CustomAgents["Custom Agents<br/>.agent.md profiles"]
+        MainAgent --> SubAgents
+        MainAgent --> CustomAgents
+    end
+
+    LLM --> MainAgent
+
+    subgraph Hooks["Layer 4: Lifecycle & Automation"]
+        direction LR
+        HookStart["sessionStart"]
+        HookPrompt["userPromptSubmitted"]
+        HookPre["preToolUse"]
+        HookPost["postToolUse"]
+        HookEnd["sessionEnd"]
+    end
+
+    Hooks -.->|"intercept & control"| Tools
+    Hooks -.->|"intercept & control"| Agents
+
+    subgraph Plugins["Layer 5: Packaging & Distribution"]
+        PluginBundle["Plugin Bundle<br/>skills + hooks + agents<br/>+ MCP configs"]
+    end
+
+    Plugins -.->|"provides"| Skills
+    Plugins -.->|"provides"| Hooks
+    Plugins -.->|"provides"| CustomAgents
+    Plugins -.->|"provides"| MCP
+
+    subgraph FileSystem["File System"]
+        GHDir[".github/ directory"]
+        UserDir["~/.copilot/ directory"]
+    end
+
+    FileSystem -.->|"loads from"| Context
+    FileSystem -.->|"loads from"| Skills
+    FileSystem -.->|"loads from"| Hooks
+    FileSystem -.->|"loads from"| CustomAgents
