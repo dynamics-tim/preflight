@@ -49,10 +49,12 @@ copilot-init/
 ├── agents/
 │   └── copilot-init.agent.md       # The core agent (entire workflow)
 ├── skills/
-│   └── copilot-init-scan/          # Optional scan helper
-│       ├── SKILL.md
-│       ├── scan.sh                 # Unix fast-scan helper
-│       └── scan.ps1                # Windows fast-scan helper
+│   ├── copilot-init-scan/          # Optional scan helper
+│   │   ├── SKILL.md
+│   │   ├── scan.sh                 # Unix fast-scan helper
+│   │   └── scan.ps1                # Windows fast-scan helper
+│   └── copilot-init-deep-scan/     # On-demand deep code analysis
+│       └── SKILL.md
 ├── references/                     # Example files the agent reads & adapts
 │   ├── copilot-instructions/       # Per-stack instruction examples
 │   ├── path-instructions/          # Path-specific instruction examples

@@ -211,33 +211,7 @@ If the project has no or minimal Copilot configuration, proceed normally.
 
 Ask: **"Would you like me to do a deeper analysis of your code patterns and conventions? This reads a sample of source files to produce better-tailored instructions. (yes/no)"**
 
-If the user says **yes**, perform the deep scan:
-
-1. **Naming conventions** — Read 5–10 source files. Check:
-   - Variable/function naming: `camelCase`, `snake_case`, `PascalCase`, `kebab-case`
-   - File naming conventions
-   - Constant naming (`UPPER_SNAKE_CASE` vs other)
-
-2. **Import style** — Check:
-   - Relative imports (`./foo`) vs absolute (`@/foo`, `~/foo`)
-   - Barrel exports (`index.ts` re-exports)
-   - Import ordering conventions
-
-3. **Architectural patterns** — Look for directories/files suggesting:
-   - MVC (controllers/, models/, views/)
-   - Services/repositories pattern
-   - Feature-based structure (features/, modules/)
-   - API route handlers
-   - Middleware patterns
-
-4. **Code style** — Check linter configs for:
-   - Semicolons yes/no
-   - Quote style (single/double)
-   - Indentation (tabs/spaces, width)
-   - Max line length
-   - Trailing commas
-
-Record all findings — you will use them in Phase 3 to generate more precise instructions.
+If the user says **yes**, use the `copilot-init-deep-scan` skill to analyze naming conventions, import styles, architectural patterns, and code style from linter configs. Incorporate the findings into Phase 3 recommendations.
 
 If the user says **no**, proceed with Phase 3 using only the quick scan data.
 
@@ -263,33 +237,7 @@ Present categories in this order:
 
 File: `.github/copilot-instructions.md`
 
-Preview example:
-```markdown
-<!-- managed-by: copilot-init -->
-
-# Copilot Instructions
-
-## Project Overview
-This is a [framework] project using [language] with [package manager].
-
-## Build & Run
-- Install: `[install command]`
-- Dev: `[dev command]`
-- Build: `[build command]`
-- Test: `[test command]`
-- Lint: `[lint command]`
-
-## Code Style
-- [Inferred conventions from scan]
-- [Linting/formatting rules]
-
-## Architecture
-- [Key directories and their purposes]
-
-<!-- end-managed-by: copilot-init -->
-```
-
-Adapt the content to the actual detected stack and conventions.
+Generate content following the structure in "Instruction Generation Rules" below. Include `<!-- managed-by: copilot-init -->` markers. Adapt to the actual detected stack — use real project names, commands, and conventions. Refer to reference examples in `references/copilot-instructions/` for tone and depth.
 
 #### Category 2: Path-specific instructions
 
@@ -451,70 +399,11 @@ Always wrap in managed markers:
 
 ### Path-specific instructions (`.github/instructions/*.instructions.md`)
 
-Structure:
-1. **YAML frontmatter** with `applyTo` glob pattern — REQUIRED
-2. **Conventions** specific to this file type or directory
-3. **Patterns to follow** — examples of how this codebase does things
-4. **Anti-patterns** — common mistakes to avoid
-
-Target length: 15–30 lines. Focus on what's unique to this language/area.
-
-Example:
-```markdown
----
-applyTo: "**/*.ts, **/*.tsx"
----
-
-<!-- managed-by: copilot-init -->
-
-## TypeScript Conventions
-
-- Use `interface` for object shapes, `type` for unions and intersections
-- Prefer `const` assertions for literal types
-- Use explicit return types on exported functions
-- Avoid `any` — use `unknown` with type guards instead
-- Imports: use path aliases (`@/...`) not relative paths beyond two levels
-
-<!-- end-managed-by: copilot-init -->
-```
+Structure: YAML frontmatter with `applyTo` glob → conventions → patterns to follow → anti-patterns. Target: 15–30 lines. Always include `<!-- managed-by: copilot-init -->` markers. Refer to reference examples in `references/path-instructions/` for format and tone.
 
 ### Custom agents (`.github/agents/*.agent.md`)
 
-Structure:
-1. **YAML frontmatter** — `name`, `description`, and `tools` (minimal set)
-2. **Identity** — one paragraph on what this agent does
-3. **Workflow** — step-by-step instructions for the agent's task
-4. **Rules** — behavioral constraints
-
-Keep agents focused. One agent = one job.
-
-Example:
-```markdown
----
-name: code-reviewer
-description: Reviews code changes for correctness, test coverage, and adherence to project conventions.
-tools:
-  - read
-  - search
----
-
-# Code Reviewer
-
-You review code changes and provide actionable feedback.
-
-## Workflow
-1. Read the changed files
-2. Check for correctness and edge cases
-3. Verify test coverage for new functionality
-4. Check adherence to project code style
-5. Present findings as a prioritized list
-
-## Rules
-- Focus on bugs, logic errors, and missing edge cases
-- Do NOT comment on formatting (the linter handles that)
-- Be specific: reference line numbers and suggest fixes
-- If everything looks good, say so briefly
-```
+Structure: YAML frontmatter (`name`, `description`, `tools`) → identity paragraph → workflow steps → behavioral rules. One agent = one job. Refer to reference examples in `references/agents/` for format and tone.
 
 ---
 
@@ -531,96 +420,4 @@ You review code changes and provide actionable feedback.
 9. **Keep it concise.** Copilot instructions that are too long get ignored. Quality over quantity.
 10. **Respect existing work.** If the user has hand-crafted instructions, treat them as authoritative.
 
----
 
-## Example Interactions
-
-Below are examples of what your output should look like at each phase. Adapt tone and content to the actual project.
-
-### Example: Phase 2 output (Scan Results)
-
-```
-## 📋 Scan Results
-
-| Category | Detected |
-|---|---|
-| **Languages** | TypeScript, CSS, HTML |
-| **Package Manager** | pnpm |
-| **Framework** | Astro + React (islands) |
-| **Test Framework** | Vitest |
-| **ORM** | Drizzle ORM |
-| **CI/CD** | GitHub Actions (2 workflows) |
-| **Linting** | ESLint + Prettier |
-| **Project Type** | Single project |
-
-### 📁 Key Directories
-`src/`, `src/components/`, `src/pages/`, `src/layouts/`, `tests/`, `public/`, `scripts/`
-
-### 🔧 Existing Copilot Config
-- ❌ No `.github/copilot-instructions.md`
-- ❌ No path-specific instructions
-- ❌ No custom agents
-- ❌ No hooks
-
-You have **no Copilot configuration yet** — great, we're starting fresh!
-
-Would you like me to do a deeper analysis of your code patterns and conventions?
-This reads a sample of source files to produce better-tailored instructions. (yes/no)
-```
-
-### Example: Phase 3 output (Recommendation)
-
-```
-## 1️⃣ Repository-wide Instructions
-
-📄 **File:** `.github/copilot-instructions.md`
-💡 **Why:** This is the single highest-impact file — it tells Copilot about your
-project's stack, commands, and conventions for every interaction.
-
-**Preview:**
-
-> # Copilot Instructions
->
-> ## Project Overview
-> This is an Astro site with React islands, using TypeScript and pnpm.
-> The content layer uses Drizzle ORM with a SQLite database.
->
-> ## Commands
-> - Install: `pnpm install`
-> - Dev: `pnpm dev`
-> - Build: `pnpm build`
-> - Test: `pnpm test` (Vitest)
-> - Lint: `pnpm lint` (ESLint + Prettier)
->
-> ## Code Style
-> - Use TypeScript strict mode — avoid `any`
-> - Components use PascalCase file names
-> - Utilities use camelCase
-> - Prefer Astro components; use React only for interactive islands
->
-> *(~35 lines total)*
-
-**Create this file? (yes / no / customize)**
-```
-
-### Example: Phase 4 output (Final Summary)
-
-```
-## ✅ Setup Complete!
-
-### Created
-| File | Purpose |
-|---|---|
-| `.github/copilot-instructions.md` | Repo-wide context and conventions |
-| `.github/instructions/typescript.instructions.md` | TS-specific coding guidance |
-| `.github/instructions/react.instructions.md` | React component conventions |
-| `.github/instructions/tests.instructions.md` | Test writing conventions |
-| `.github/agents/code-reviewer.agent.md` | PR review agent |
-| `.github/.copilot-init-state.json` | State tracking for re-runs |
-
-### Next Steps
-1. 📖 Review the generated files — tweak anything that doesn't match your preferences
-2. 📝 Commit the `.github/` directory to your repo
-3. 🤖 Copilot will automatically pick up instructions on your next chat
-4. 🔄 Run `@copilot-init` again anytime — it updates managed sections without touching your edits
-```
