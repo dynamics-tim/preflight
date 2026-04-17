@@ -10,5 +10,5 @@
   "repository": "https://github.com/dynamics-tim/copilot-init",
   "keywords": ["copilot", "setup", "scaffolding", "instructions", "agents", "configuration"],
   "agents": "agents/",
-  "skills": ["skills/copilot-init-scan/", "skills/copilot-init-deep-scan/"]
+  "skills": ["skills/copilot-init-scan/", "skills/copilot-init-deep-scan/", "skills/skill-extractor/"]
 }

@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      {
+        "event": "sessionStart",
+        "steps": [
+          {
+            "type": "command",
+            "command": {
+              "bash": "mkdir -p .copilot && echo '{\"ts\":\"'$(date -u '+%Y-%m-%dT%H:%M:%SZ')'\",\"event\":\"session_start\",\"cwd\":\"'$(basename \"$PWD\")'\"}' >> .copilot/session-activity.jsonl && [ -f .copilot/pending-skill-review ] && echo '[skill-extractor] Previous session has unreviewed patterns — say \"review last session\" to extract skills.' >&2 || true",
+              "powershell": "if (-not (Test-Path .copilot)) { New-Item -ItemType Directory -Path .copilot -Force | Out-Null }; $ts = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ'); Add-Content -Path .copilot/session-activity.jsonl -Value ('{\"ts\":\"' + $ts + '\",\"event\":\"session_start\",\"cwd\":\"' + (Split-Path -Leaf (Get-Location)) + '\"}') -Encoding UTF8; if (Test-Path .copilot/pending-skill-review) { Write-Host '[skill-extractor] Previous session has unreviewed patterns - say \"review last session\" to extract skills.' }"
+            },
+            "timeoutSec": 5
+          }
+        ]
+      }
+    ],
+    "postToolUse": [
+      {
+        "event": "postToolUse",
+        "steps": [
+          {
+            "type": "command",
+            "command": {
+              "bash": "mkdir -p .copilot && echo '{\"ts\":\"'$(date -u '+%Y-%m-%dT%H:%M:%SZ')'\",\"tool\":\"'${COPILOT_TOOL_NAME:-unknown}'\"}' >> .copilot/session-activity.jsonl 2>/dev/null || true",
+              "powershell": "try { if (-not (Test-Path .copilot)) { New-Item -ItemType Directory -Path .copilot -Force | Out-Null }; $tool = if ($env:COPILOT_TOOL_NAME) { $env:COPILOT_TOOL_NAME } else { 'unknown' }; Add-Content -Path .copilot/session-activity.jsonl -Value ('{\"ts\":\"' + (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ') + '\",\"tool\":\"' + $tool + '\"}') -Encoding UTF8 } catch {}"
+            },
+            "timeoutSec": 5
+          }
+        ]
+      }
+    ],
+    "sessionEnd": [
+      {
+        "event": "sessionEnd",
+        "steps": [
+          {
+            "type": "command",
+            "command": {
+              "bash": "mkdir -p .copilot && echo '{\"ts\":\"'$(date -u '+%Y-%m-%dT%H:%M:%SZ')'\",\"event\":\"session_end\"}' >> .copilot/session-activity.jsonl && echo 'review' > .copilot/pending-skill-review 2>/dev/null || true",
+              "powershell": "if (-not (Test-Path .copilot)) { New-Item -ItemType Directory -Path .copilot -Force | Out-Null }; Add-Content -Path .copilot/session-activity.jsonl -Value ('{\"ts\":\"' + (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ') + '\",\"event\":\"session_end\"}') -Encoding UTF8; Set-Content -Path .copilot/pending-skill-review -Value 'review' -Encoding UTF8"
+            },
+            "timeoutSec": 5
+          }
+        ]
+      }
+    ]
+  }
+}
