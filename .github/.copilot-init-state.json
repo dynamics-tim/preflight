@@ -1,0 +1,19 @@
+{
+  "version": "1.0.0",
+  "lastRun": "2026-04-17T19:39:22.942Z",
+  "detectedStack": {
+    "languages": ["markdown", "powershell", "bash", "json"],
+    "frameworks": [],
+    "packageManager": null,
+    "testFramework": null,
+    "cicd": null
+  },
+  "managedFiles": [
+    ".github/copilot-instructions.md",
+    ".github/instructions/markdown.instructions.md",
+    ".github/instructions/scripts.instructions.md",
+    ".github/instructions/agents.instructions.md",
+    ".github/agents/docs-writer.agent.md",
+    ".github/agents/code-reviewer.agent.md"
+  ]
+}
