@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "_comment": "Session activity logger for skill extraction. Logs are in .copilot/ (gitignored).",
+  "_comment": "Session activity logger for skill extraction. Add .copilot/ to your .gitignore — logs are ephemeral.",
   "hooks": {
     "sessionStart": [
       {

@@ -2,7 +2,7 @@
 name: copilot-init-scan
 description: Fast codebase scanning for copilot-init. Detects tech stack, frameworks, folder structure, and existing Copilot configuration. Use when initializing or auditing a Copilot setup.
 allowed-tools:
-  - shell
+  - execute
   - read
   - search
 ---
