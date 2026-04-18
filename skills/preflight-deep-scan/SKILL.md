@@ -1,8 +1,8 @@
 ---
-name: copilot-init-deep-scan
+name: preflight-deep-scan
 description: |
   Deep analysis of code patterns, naming conventions, import styles,
-  and architectural patterns for copilot-init. Use when setting up Copilot
+  and architectural patterns for preflight. Use when setting up Copilot
   configuration and the user wants a deeper analysis beyond manifest-level detection.
   Triggers: "deep scan", "analyze patterns", "code conventions", "deeper analysis".
 allowed-tools:

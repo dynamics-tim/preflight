@@ -1,4 +1,4 @@
-# Plan: `copilot-init` — Open-Source Copilot Bootstrap Tool
+# Plan: `preflight` — Open-Source Copilot Bootstrap Tool
 
 ## Problem Statement
 
@@ -6,13 +6,13 @@ There is no turnkey way to initialize a fully optimized GitHub Copilot setup for
 
 ## Proposed Solution
 
-Build **`copilot-init`** — an open-source tool that scans any codebase, recommends a tailored Copilot setup, and scaffolds all configuration files interactively. Self-contained and project-agnostic.
+Build **`preflight`** — an open-source tool that scans any codebase, recommends a tailored Copilot setup, and scaffolds all configuration files interactively. Self-contained and project-agnostic.
 
 ### Development Strategy: Agent-First, Plugin-Later
 
 Following the official best practice ("start manual, package later"), we develop in phases:
 
-1. **v1: Agent + Skill** — A custom agent (`copilot-init.agent.md`) that owns the entire workflow, plus one optional helper skill. Testable by copying into any repo's `.github/agents/`.
+1. **v1: Agent + Skill** — A custom agent (`preflight.agent.md`) that owns the entire workflow, plus one optional helper skill. Testable by copying into any repo's `.github/agents/`.
 2. **v2: Plugin packaging** — Once the agent and workflow are stable, wrap everything in a `plugin.json` for `/plugin install` distribution.
 
 This avoids coupling to the still-evolving plugin API while letting us iterate on the hard problems (scan quality, recommendations, idempotent scaffolding) first.
@@ -24,7 +24,7 @@ This avoids coupling to the still-evolving plugin API while letting us iterate o
 The custom agent owns the **entire deterministic workflow**. Skills are NOT used as orchestration steps (they are relevance-triggered, not reliably callable as subroutines). The agent uses Copilot's native tools (`read`, `search`, `glob`, `shell`) for scanning — no external script is the center of gravity.
 
 ```
-User runs: /agent copilot-init (or copies agent into .github/agents/)
+User runs: /agent preflight (or copies agent into .github/agents/)
          ↓
 Phase 1: Quick Scan (agent uses native tools)
   - glob/read: Detect manifest files (package.json, Cargo.toml, pyproject.toml, etc.)
@@ -67,16 +67,16 @@ From the official docs: Skills are "on-demand, relevance-triggered context injec
 Clear separation between **plugin runtime assets** (what makes the tool work) and **reference examples** (what gets adapted and written into the target repo).
 
 ```
-copilot-init/
+preflight/
 ├── README.md                              # Docs, installation, usage
 ├── LICENSE                                # MIT
 ├── PLAN.md                                # This file
 │
 ├── agents/
-│   └── copilot-init.agent.md              # THE core: orchestrator agent (entire workflow)
+│   └── preflight.agent.md              # THE core: orchestrator agent (entire workflow)
 │
 ├── skills/
-│   └── copilot-init-scan/                 # Optional helper skill (reusable scan knowledge)
+│   └── preflight-scan/                 # Optional helper skill (reusable scan knowledge)
 │       ├── SKILL.md                       # Scan heuristics reference (not the workflow)
 │       ├── scan.sh                        # Optional: fast deterministic fact extraction
 │       └── scan.ps1                       # Windows equivalent
@@ -107,8 +107,8 @@ copilot-init/
 
 ### Key Structural Decisions
 
-- **`agents/copilot-init.agent.md`** — Contains the FULL workflow as agent instructions (30,000 char limit is plenty)
-- **`skills/copilot-init-scan/`** — Optional helper, NOT a workflow step. Contains scan heuristics as reference knowledge + helper scripts for fast fact extraction
+- **`agents/preflight.agent.md`** — Contains the FULL workflow as agent instructions (30,000 char limit is plenty)
+- **`skills/preflight-scan/`** — Optional helper, NOT a workflow step. Contains scan heuristics as reference knowledge + helper scripts for fast fact extraction
 - **`references/`** — Example files the agent reads and adapts to the target project. These are NOT templates with variable placeholders — they are complete, working examples that the LLM adapts intelligently
 - **`plugin.json`** — Added later in v2. Not needed for v1 (agent can be copied or linked directly)
 
@@ -118,18 +118,18 @@ Each artifact type has an explicit merge policy. The agent checks for existing f
 
 | Artifact | If Missing | If Exists (unmanaged) | If Exists (managed*) |
 |---|---|---|---|
-| `.github/copilot-instructions.md` | Create from reference | Show diff, propose append to a `## copilot-init additions` section | Update managed section only |
+| `.github/copilot-instructions.md` | Create from reference | Show diff, propose append to a `## preflight additions` section | Update managed section only |
 | `.github/instructions/*.instructions.md` | Create per detected language | Skip if same `applyTo` glob exists | Replace managed file |
 | `.github/agents/*.agent.md` | Create recommended agents | Skip, inform user | Replace managed file |
 | `.github/skills/*/SKILL.md` | Create with unique name | Never overwrite | Replace managed skill |
 | `.github/hooks/*.json` | Create if user confirms | Parse and merge by hook type | Merge new hooks into existing arrays |
 | `AGENTS.md` | Never create (user's domain) | Never overwrite | Never overwrite |
 
-*\*Managed = file contains a `<!-- managed-by: copilot-init -->` marker comment (or JSON equivalent)*
+*\*Managed = file contains a `<!-- managed-by: preflight -->` marker comment (or JSON equivalent)*
 
 ### State Tracking
 
-On first run, creates `.github/.copilot-init-state.json`:
+On first run, creates `.github/.preflight-state.json`:
 ```json
 {
   "version": "1.0.0",
@@ -149,12 +149,12 @@ This enables safe re-runs: the agent knows what it created vs. what the user cre
 ### Phase 1: Core Agent (v1 — the MVP)
 
 1. **`repo-setup`** — Create repo structure, README, LICENSE
-2. **`init-agent`** — Build `copilot-init.agent.md`:
+2. **`init-agent`** — Build `preflight.agent.md`:
    - Full workflow in agent prompt (scan → recommend → confirm → scaffold)
    - Uses native tools (glob, read, search, create, edit) for all scanning
    - Interactive confirmation for each recommended artifact
    - Idempotency logic with managed-file markers
-   - State tracking via `.copilot-init-state.json`
+   - State tracking via `.preflight-state.json`
 3. **`reference-examples`** — Create reference example files:
    - 4x stack-specific instruction examples (TS, Python, Rust, general)
    - 4x path-specific instruction examples

@@ -2,7 +2,7 @@
 applyTo: "agents/**/*.md, references/agents/**/*.md"
 ---
 
-<!-- managed-by: copilot-init -->
+<!-- managed-by: preflight -->
 
 # Agent Definition Conventions
 
@@ -38,4 +38,4 @@ tools:
 - Include specific output format requirements when the agent produces structured results.
 - Keep the total prompt under 2,000 words — agents that are too verbose get diluted.
 
-<!-- end-managed-by: copilot-init -->
+<!-- end-managed-by: preflight -->

@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Codebase scanner for copilot-init. Outputs structured JSON to stdout.
+  Codebase scanner for preflight. Outputs structured JSON to stdout.
 .PARAMETER Directory
   Directory to scan (defaults to current directory).
 #>

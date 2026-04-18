@@ -2,7 +2,7 @@
 applyTo: "**/*.md"
 ---
 
-<!-- managed-by: copilot-init -->
+<!-- managed-by: preflight -->
 
 # Markdown Conventions
 
@@ -29,7 +29,7 @@ applyTo: "**/*.md"
 
 ## Managed Markers
 
-- Wrap generated content with `<!-- managed-by: copilot-init -->` and `<!-- end-managed-by: copilot-init -->`.
+- Wrap generated content with `<!-- managed-by: preflight -->` and `<!-- end-managed-by: preflight -->`.
 - Never place user-authored content inside managed markers — it will be overwritten on re-run.
 
-<!-- end-managed-by: copilot-init -->
+<!-- end-managed-by: preflight -->

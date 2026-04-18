@@ -1,13 +1,13 @@
 ---
-name: copilot-init-scan
-description: Fast codebase scanning for copilot-init. Detects tech stack, frameworks, folder structure, and existing Copilot configuration. Use when initializing or auditing a Copilot setup.
+name: preflight-scan
+description: Fast codebase scanning for preflight. Detects tech stack, frameworks, folder structure, and existing Copilot configuration. Use when initializing or auditing a Copilot setup.
 allowed-tools:
   - execute
   - read
   - search
 ---
 
-# Copilot Init — Codebase Scanner
+# Preflight — Codebase Scanner
 
 ## Purpose
 Quickly scan a project directory to extract structured facts about the tech stack,
@@ -33,6 +33,6 @@ The scripts output JSON with these fields:
 - `existingCopilotConfig`: object listing found Copilot config files
 
 ## When This Skill Is Used
-The copilot-init agent may invoke this skill for rapid, deterministic
+The preflight agent may invoke this skill for rapid, deterministic
 fact extraction. The agent can also scan using native tools directly —
 this skill is an optional accelerator, not a required dependency.

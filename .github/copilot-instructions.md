@@ -1,6 +1,6 @@
-<!-- managed-by: copilot-init -->
+<!-- managed-by: preflight -->
 
-# copilot-init — Copilot Plugin Project
+# preflight — Copilot Plugin Project
 
 This is an open-source GitHub Copilot plugin that scans any codebase and interactively scaffolds an optimized Copilot configuration (instructions, path-specific rules, custom agents, session-learning hooks). The project contains no compiled code or package manager — it is entirely Markdown, shell scripts (Bash + PowerShell), and JSON.
 
@@ -8,11 +8,11 @@ This is an open-source GitHub Copilot plugin that scans any codebase and interac
 
 ```
 agents/
-  copilot-init.agent.md         — The core agent prompt; owns the entire workflow
+  preflight.agent.md            — The core agent prompt; owns the entire workflow
   skill-extractor.agent.md      — Analyzes session logs, generates reusable skills
 skills/
-  copilot-init-scan/            — Optional fast-scan helper (scan.sh + scan.ps1)
-  copilot-init-deep-scan/       — On-demand code pattern analysis skill
+  preflight-scan/               — Optional fast-scan helper (scan.sh + scan.ps1)
+  preflight-deep-scan/          — On-demand code pattern analysis skill
   skill-extractor/              — Session pattern heuristics, evaluation heuristics + rich logging scripts
 references/                     — Working example files the LLM reads and adapts
   copilot-instructions/         — Per-stack instruction examples
@@ -36,7 +36,7 @@ plugin.json                     — Plugin manifest for `copilot plugin install`
 - **File naming:** `kebab-case` everywhere (`code-reviewer.agent.md`, `scan.sh`)
 - **Agent/skill files:** Always include YAML frontmatter (`name`, `description`, `tools`)
 - **Reference examples:** Complete, working examples — NOT templates with placeholders. The LLM reads and adapts them intelligently.
-- **Managed markers:** Generated files use `<!-- managed-by: copilot-init -->` and `<!-- end-managed-by: copilot-init -->` for idempotent updates
+- **Managed markers:** Generated files use `<!-- managed-by: preflight -->` and `<!-- end-managed-by: preflight -->` for idempotent updates
 - **Dual-platform scripts:** Every shell script ships as a `.sh` + `.ps1` pair with identical JSON output
 
 ## Shell Script Conventions
@@ -63,4 +63,4 @@ plugin.json                     — Plugin manifest for `copilot plugin install`
 - Skills should NOT list `ask_user` in `allowed-tools` — user interaction happens through the agent
 - Keep skill trigger descriptions narrow to avoid false-positive context injection
 
-<!-- end-managed-by: copilot-init -->
+<!-- end-managed-by: preflight -->

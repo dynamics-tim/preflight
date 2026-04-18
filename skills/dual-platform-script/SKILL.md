@@ -1,7 +1,7 @@
 ---
 name: dual-platform-script
 description: |
-  Authoring paired helper scripts for copilot-init skills. Use when creating
+  Authoring paired helper scripts for preflight skills. Use when creating
   or updating a `.sh` + `.ps1` pair under `skills/*/` that must emit the same
   JSON schema. Not for one-off shell examples, CI snippets, or reference hooks.
   Triggers: "create skill script", "add helper script pair", "new scan script",
@@ -30,8 +30,8 @@ the cross-file coordination that instruction files cannot express.
    matching `.ps1` in the same directory (and vice versa). If neither exists yet,
    confirm the skill directory path before creating both.
 
-2. **Read an existing pair for conventions** — Use `read` on `skills/copilot-init-scan/scan.sh`
-   and `skills/copilot-init-scan/scan.ps1` as the canonical reference pair.
+2. **Read an existing pair for conventions** — Use `read` on `skills/preflight-scan/scan.sh`
+   and `skills/preflight-scan/scan.ps1` as the canonical reference pair.
    Match their structure: functions-then-main (Bash), function declarations then
    `$output` hashtable (PowerShell).
 

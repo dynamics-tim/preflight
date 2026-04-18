@@ -1,8 +1,8 @@
-# copilot-init
+# preflight
 
 > Scan any codebase. Get an optimized GitHub Copilot setup. Instantly.
 
-**copilot-init** is an open-source custom agent that scans your project, recommends a tailored Copilot configuration, and scaffolds all the files interactively.
+**preflight** is an open-source custom agent that scans your project, recommends a tailored Copilot configuration, and scaffolds all the files interactively.
 
 ## Quick Start
 
@@ -10,19 +10,19 @@
 
 ```bash
 # One command — works in Copilot CLI and VS Code
-copilot plugin install dynamics-tim/copilot-init
+copilot plugin install dynamics-tim/preflight
 
 # Then open any project and invoke it
-@copilot-init
+@preflight
 ```
 
 ### Option 2: Manual Copy
 
 ```bash
 # Clone and copy files into your project
-git clone https://github.com/dynamics-tim/copilot-init.git /tmp/copilot-init
+git clone https://github.com/dynamics-tim/preflight.git /tmp/preflight
 mkdir -p YOUR_PROJECT/.github/agents
-cp /tmp/copilot-init/agents/copilot-init.agent.md YOUR_PROJECT/.github/agents/
+cp /tmp/preflight/agents/preflight.agent.md YOUR_PROJECT/.github/agents/
 ```
 
 > **Note:** The manual approach requires copying `references/` too for best-quality output.
@@ -42,12 +42,12 @@ cp /tmp/copilot-init/agents/copilot-init.agent.md YOUR_PROJECT/.github/agents/
 | `.github/copilot-instructions.md` | Repository-wide coding standards and conventions |
 | `.github/instructions/*.instructions.md` | Language/path-specific rules (e.g., React components, API routes) |
 | `.github/agents/*.agent.md` | Custom agent profiles (e.g., code reviewer, test specialist) |
-| `.github/.copilot-init-state.json` | State tracking for idempotent re-runs |
+| `.github/.preflight-state.json` | State tracking for idempotent re-runs |
 | `.github/hooks/config-freshness.json` | Session-start hook that reminds you when config needs updating |
 
 ## How It Works
 
-The core is a single custom agent (`copilot-init.agent.md`) that owns the entire workflow. It uses Copilot's native tools (glob, read, search, create, edit) for scanning — no external dependencies required.
+The core is a single custom agent (`preflight.agent.md`) that owns the entire workflow. It uses Copilot's native tools (glob, read, search, create, edit) for scanning — no external dependencies required.
 
 Reference example files in `references/` provide best-practice templates that the agent reads and adapts to your specific project.
 
@@ -56,17 +56,17 @@ See [PLAN.md](PLAN.md) for the full architecture and design decisions.
 ## Project Structure
 
 ```
-copilot-init/
+preflight/
 ├── plugin.json                     # Plugin manifest for one-command install
 ├── agents/
-│   ├── copilot-init.agent.md       # The core agent (entire workflow)
+│   ├── preflight.agent.md       # The core agent (entire workflow)
 │   └── skill-extractor.agent.md    # Extracts reusable skills from session patterns
 ├── skills/
-│   ├── copilot-init-scan/          # Optional scan helper
+│   ├── preflight-scan/          # Optional scan helper
 │   │   ├── SKILL.md
 │   │   ├── scan.sh                 # Unix fast-scan helper
 │   │   └── scan.ps1                # Windows fast-scan helper
-│   ├── copilot-init-deep-scan/     # On-demand deep code analysis
+│   ├── preflight-deep-scan/     # On-demand deep code analysis
 │   │   └── SKILL.md
 │   └── skill-extractor/            # Session pattern analysis & skill generation
 │       ├── SKILL.md
@@ -139,10 +139,10 @@ See `skills/skill-extractor/SKILL.md` for the full workflow and pattern detectio
 
 ## Config Maintenance
 
-copilot-init can install a lightweight **config freshness hook** that checks at each session start whether your Copilot configuration might be out of date. If your config is older than 30 days (configurable), you'll see a one-line reminder:
+preflight can install a lightweight **config freshness hook** that checks at each session start whether your Copilot configuration might be out of date. If your config is older than 30 days (configurable), you'll see a one-line reminder:
 
 ```
-[copilot-init] Config is 34 days old — run @copilot-init to update.
+[preflight] Config is 34 days old — run @preflight to update.
 ```
 
 The hook is opt-in (offered during setup with `default: true`), non-blocking, and benefits all team members once committed.

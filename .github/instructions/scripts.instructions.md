@@ -2,7 +2,7 @@
 applyTo: "**/*.ps1, **/*.sh"
 ---
 
-<!-- managed-by: copilot-init -->
+<!-- managed-by: preflight -->
 
 # Shell Script Conventions
 
@@ -33,4 +33,4 @@ applyTo: "**/*.ps1, **/*.sh"
 - Always skip: `node_modules`, `.git`, `dist`, `build`, `target`, `venv`, `__pycache__`, `.next`, `.venv`, `vendor`, `.cache`, `.output`.
 - Keep the exclusion list identical between `.sh` and `.ps1` versions.
 
-<!-- end-managed-by: copilot-init -->
+<!-- end-managed-by: preflight -->
