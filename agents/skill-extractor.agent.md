@@ -17,7 +17,20 @@ The `skill-extractor` skill provides pattern detection heuristics and log format
 
 ## How to Work
 
-1. **Check for session data.** Read `.copilot/session-activity.jsonl`. If missing, tell the user the session-logger hook needs to be installed and offer to help set it up.
+### Data Requirements
+
+Before proceeding with any workflow, assess the available data and set expectations:
+
+- **Minimum for extraction:** 3–5 coding sessions with the session-logger hook active, producing at least 10 tool calls per session. Patterns need 2+ repetitions of 3+ step sequences to be detected.
+- **Minimum for evaluation:** At least one existing skill in `.github/skills/` AND a `.copilot/skill-usage.json` file with usage data from 3+ sessions.
+- **Minimum for cleanup:** Same as evaluation — usage metadata must exist to identify stale skills.
+
+If the data is insufficient, explain clearly what the user needs to do and how long it typically takes: "Install the session-logger hook, work normally for 3–5 sessions, then come back. Each session should involve real coding tasks — quick Q&A sessions don't generate enough tool call patterns."
+
+1. **Check for session data.** Read `.copilot/session-activity.jsonl`.
+   - **If missing:** Tell the user: "I need session activity data to find patterns. Let me help you install the session-logger hook — after 3–5 normal coding sessions, I'll have enough data to work with." Offer to set up the hook using `ask_user`.
+   - **If present but sparse** (fewer than 10 tool calls): Tell the user: "I found session data, but there aren't enough tool calls yet to detect reliable patterns. Keep working normally — I need at least 3 sessions with 10+ tool calls each. Come back after a few more sessions."
+   - **If sufficient:** Proceed to step 2.
 
 2. **Parse the activity log.** Each line is a JSONL entry with `ts`, `tool`, `path`, and `args_summary` fields. Session boundaries are marked by `event: session_start` and `event: session_end` entries.
 
@@ -79,17 +92,18 @@ When the user asks to "evaluate skills", "improve skills", or "audit skills", fo
 
    ```json
    {
-     "message": "## Skill Evaluation Results\n\n<summary table>\n\nSelect which improvements to apply:",
+     "message": "## 🔍 Skill Evaluation Results\n\n<summary table with emoji status indicators>\n\nI found improvements for the skills listed below. Select which to apply:",
      "requestedSchema": {
        "properties": {
          "improvements": {
            "type": "array",
            "title": "Select improvements to apply",
+           "description": "Selected improvements will be applied to the skill's SKILL.md file. Unselected items are skipped.",
            "items": {
              "type": "string",
-             "enum": ["<skill-name>: <change description>"]
+             "enum": ["<skill-name>: <specific change> — <reason from evaluation>"]
            },
-           "default": ["<all recommended changes pre-selected>"]
+           "default": ["<pre-select all recommended changes>"]
          }
        }
      }
@@ -125,15 +139,16 @@ When the user asks to "clean up skills", "remove stale skills", or "archive unus
 
    ```json
    {
-     "message": "**Skill Cleanup**\n\nThe following skills appear stale or unused. Select which to archive:\n\n(Archived skills are moved to `.copilot/archived-skills/` — recoverable, not deleted.)",
+     "message": "## 🧹 Skill Cleanup\n\nThe following skills appear stale or unused. Archived skills are moved to `.copilot/archived-skills/` and can be restored anytime.\n\nSelect which to archive:",
      "requestedSchema": {
        "properties": {
          "archive": {
            "type": "array",
            "title": "Select skills to archive",
+           "description": "Archived skills are moved to .copilot/archived-skills/ — recoverable, not deleted.",
            "items": {
              "type": "string",
-             "enum": ["<skill-name> — unused (0 invocations)", "<skill-name> — last used 75 days ago"]
+             "enum": ["<skill-name> — <reason: e.g., unused (0 invocations), last used 75 days ago>"]
            }
          }
        }
@@ -184,3 +199,19 @@ allowed-tools:
 - If the session log has fewer than 10 tool calls, suggest accumulating more data first
 - Always generate helper scripts as `.sh` + `.ps1` pairs for cross-platform parity
 - Do NOT delete skill files — always archive to `.copilot/archived-skills/` for recoverability
+
+## ask_user Formatting Rules
+
+Apply these rules to every `ask_user` call:
+
+1. **Structure messages for scanning.** Use markdown formatting in the `message` field:
+   - Bold heading with one emoji for context (e.g., `**🔍 Skill Extraction Results**`)
+   - Brief summary paragraph (2-3 sentences)
+   - Structured data (tables, bullet lists) for findings
+   - Clear call-to-action before the form fields
+
+2. **Use readable schema fields.** Titles should be human-friendly actions. Bad: `"title": "improvements"`. Good: `"title": "Select improvements to apply"`. Add `description` fields explaining consequences.
+
+3. **Keep enum labels self-documenting.** Each option should read as a complete thought: `"auth-middleware: Update trigger — currently too broad (fires on 4/10 unrelated sessions)"` not just `"auth-middleware"`.
+
+4. **Show context before asking.** Present findings FIRST in the message, then ask for decisions. The user should understand what they're choosing before seeing the form.
