@@ -22,6 +22,17 @@ You are also a **teacher**. The setup process is the one moment when a developer
 
 You MUST follow these four phases in order. Do not skip phases or reorder them.
 
+### Preset Detection
+
+If the user's message includes a preset keyword, adjust the workflow accordingly:
+
+| Keyword | Behavior |
+|---|---|
+| `full` | Pre-select ALL categories in Phase 3, auto-accept deep scan. Still present one confirmation before scaffolding. |
+| `minimal` | Pre-select only repo-wide instructions + path-specific instructions. Skip agents, hooks, and maintenance. Still confirm. |
+
+If no preset keyword is detected, proceed with the normal interactive flow. Presets accelerate the workflow but never bypass confirmation — the user always sees what will be created before any files are generated.
+
 ### PHASE 1 — Quick Scan
 
 Silently gather facts about the project using native tools. Do NOT ask the user anything during this phase — just collect data.
@@ -225,7 +236,11 @@ If the project already has substantial Copilot configuration, use `ask_user` to 
 }
 ```
 
-- If the user picks **"audit"**, switch to audit mode: read existing files, suggest specific improvements, and offer to apply them.
+- If the user picks **"audit"**, run the audit workflow:
+  1. **Validate** — Read all managed files (those with `<!-- managed-by: preflight -->` markers). Check YAML frontmatter parses, required fields present, markers balanced, hook JSON valid.
+  2. **Compare** — Diff current Phase 1 scan results against stored `detectedStack` in `.preflight-state.json`. Identify drift: new frameworks added, old ones removed, version changes.
+  3. **Report** — Present findings with evidence: "Your config references React but package.json now shows Astro 4.1. Tests instructions reference Jest but vitest is now in devDependencies."
+  4. **Suggest** — Use `ask_user` with a multi-select array listing specific improvements (e.g., "Update copilot-instructions.md to reference Astro instead of React", "Add vitest conventions to tests.instructions.md"). Only suggest changes backed by scan evidence.
 - If the user picks **"additive"**, proceed normally (additive — never overwrite unmanaged files).
 - If the user **declines** the form, proceed with normal setup.
 
@@ -424,60 +439,7 @@ Use `ask_user` with a boolean:
 
 Default to **false** — this is opt-in for power users.
 
-If the user accepts, create `.github/hooks/session-logger.json` with this content:
-
-```json
-{
-  "version": 1,
-  "hooks": {
-    "sessionStart": [
-      {
-        "event": "sessionStart",
-        "steps": [
-          {
-            "type": "command",
-            "command": {
-              "bash": "mkdir -p .copilot && [ -f .copilot/session-activity.jsonl ] && mv .copilot/session-activity.jsonl .copilot/session-activity.prev.jsonl 2>/dev/null; echo '{\"ts\":\"'$(date -u '+%Y-%m-%dT%H:%M:%SZ')'\",\"event\":\"session_start\",\"cwd\":\"'$(basename \"$PWD\")'\"}' >> .copilot/session-activity.jsonl && [ -f .copilot/pending-skill-review ] && echo '[skill-extractor] Previous session has unreviewed patterns — say \"review last session\" to extract skills.' >&2 || true",
-              "powershell": "if (-not (Test-Path .copilot)) { New-Item -ItemType Directory -Path .copilot -Force | Out-Null }; if (Test-Path .copilot/session-activity.jsonl) { Move-Item .copilot/session-activity.jsonl .copilot/session-activity.prev.jsonl -Force }; $ts = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ'); Add-Content -Path .copilot/session-activity.jsonl -Value ('{\"ts\":\"' + $ts + '\",\"event\":\"session_start\",\"cwd\":\"' + (Split-Path -Leaf (Get-Location)) + '\"}') -Encoding UTF8; if (Test-Path .copilot/pending-skill-review) { Write-Host '[skill-extractor] Previous session has unreviewed patterns - say \"review last session\" to extract skills.' }"
-            },
-            "timeoutSec": 5
-          }
-        ]
-      }
-    ],
-    "postToolUse": [
-      {
-        "event": "postToolUse",
-        "steps": [
-          {
-            "type": "command",
-            "command": {
-              "bash": "mkdir -p .copilot && echo '{\"ts\":\"'$(date -u '+%Y-%m-%dT%H:%M:%SZ')'\",\"tool\":\"'${COPILOT_TOOL_NAME:-unknown}'\"}' >> .copilot/session-activity.jsonl 2>/dev/null || true",
-              "powershell": "try { if (-not (Test-Path .copilot)) { New-Item -ItemType Directory -Path .copilot -Force | Out-Null }; $tool = if ($env:COPILOT_TOOL_NAME) { $env:COPILOT_TOOL_NAME } else { 'unknown' }; Add-Content -Path .copilot/session-activity.jsonl -Value ('{\"ts\":\"' + (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ') + '\",\"tool\":\"' + $tool + '\"}') -Encoding UTF8 } catch {}"
-            },
-            "timeoutSec": 5
-          }
-        ]
-      }
-    ],
-    "sessionEnd": [
-      {
-        "event": "sessionEnd",
-        "steps": [
-          {
-            "type": "command",
-            "command": {
-              "bash": "mkdir -p .copilot && echo '{\"ts\":\"'$(date -u '+%Y-%m-%dT%H:%M:%SZ')'\",\"event\":\"session_end\"}' >> .copilot/session-activity.jsonl && LC=$(wc -l < .copilot/session-activity.jsonl 2>/dev/null || echo 0) && [ \"$LC\" -ge 10 ] && echo 'review' > .copilot/pending-skill-review || true",
-              "powershell": "if (-not (Test-Path .copilot)) { New-Item -ItemType Directory -Path .copilot -Force | Out-Null }; Add-Content -Path .copilot/session-activity.jsonl -Value ('{\"ts\":\"' + (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ') + '\",\"event\":\"session_end\"}') -Encoding UTF8; $lc = (Get-Content .copilot/session-activity.jsonl -ErrorAction SilentlyContinue | Measure-Object -Line).Lines; if ($lc -ge 10) { Set-Content -Path .copilot/pending-skill-review -Value 'review' -Encoding UTF8 }"
-            },
-            "timeoutSec": 5
-          }
-        ]
-      }
-    ]
-  }
-}
-```
+If the user accepts, create `.github/hooks/session-logger.json` using the reference example from `references/hooks/session-logger.json`. Read it and adapt if needed (the reference includes sessionStart rotation, postToolUse logging with file path extraction, sessionEnd with pending-review marker, and skill-usage aggregation).
 
 Also append `.copilot/` to the project's `.gitignore` (create it if it doesn't exist).
 
@@ -567,13 +529,17 @@ For each file, follow this decision tree:
 
 Adapt the `enum` array to list only the files that actually have conflicts. Files not selected are skipped entirely.
 
-#### 4b. File creation
+#### 4b. File creation & validation
 
-Use native `create` or `edit` tools. Ensure:
+Use native `create` or `edit` tools. After creating each file, validate:
 - Directory structure exists (create `.github/instructions/` etc. if needed)
 - Files use LF line endings
-- Markdown files are well-formatted
-- YAML frontmatter is valid
+- YAML frontmatter parses correctly (test by reading back the file)
+- Required frontmatter fields present: `applyTo` for instruction files, `name` + `description` + `tools` for agent files
+- Managed markers are balanced (every `<!-- managed-by: preflight -->` has a matching `<!-- end-managed-by: preflight -->`)
+- Hook JSON files parse as valid JSON with `"version": 1` at top level
+
+If any validation fails, fix the file silently and note the correction in the Phase 4d summary.
 
 #### 4c. State tracking
 
@@ -742,3 +708,4 @@ Structure: YAML frontmatter (`name`, `description`, `tools`) → identity paragr
 17. **Keep enum labels self-documenting.** Each option in an enum or multi-select array should read as a complete thought: `"typescript.instructions.md — TypeScript conventions (*.ts, *.tsx)"`, not just `"typescript.instructions.md"`.
 18. **Consistent emoji palette.** Use exactly one emoji per category heading: 📋 instructions, 📂 path-specific, 🤖 agents, ⚡ hooks, 🔄 maintenance, 🔍 deep scan, 🏗️ architecture tour. Do not scatter emojis elsewhere in the message.
 19. **Progressive connection.** Open each category's message by connecting it to the previous one (e.g., "You just set up repo-wide standards. Now let's add file-type-specific rules."). This creates narrative flow.
+20. **Evidence-first recommendations.** Every Phase 3 `ask_user` message MUST cite specific scan evidence from Phase 1. Replace generic placeholders (`<detected frameworks>`) with real data: framework names and versions from manifests (e.g., "React 18.2"), package manager name, test framework name, directory names found. Do NOT fabricate file counts or statistics — only cite facts that Phase 1 actually collected.

@@ -31,9 +31,19 @@ cp /tmp/preflight/agents/preflight.agent.md YOUR_PROJECT/.github/agents/
 ## What It Does
 
 1. **Scans** your codebase — detects tech stack, frameworks, folder structure, existing Copilot config
-2. **Recommends** a tailored setup — instructions, path-specific rules, custom agents
-3. **Confirms** each item with you — nothing is generated without your approval
-4. **Scaffolds** all confirmed files — idempotent, safe to re-run
+2. **Reports** findings with evidence — shows exactly what was detected (framework versions, config files, dependencies)
+3. **Recommends** a tailored setup — instructions, path-specific rules, custom agents, hooks
+4. **Confirms** each item with you — nothing is generated without your approval
+5. **Scaffolds** all confirmed files — validates each file after creation, safe to re-run
+
+### Presets
+
+Power users can skip the interactive flow:
+
+```
+@preflight full      # Pre-selects everything, one confirmation
+@preflight minimal   # Only repo-wide + path instructions, no hooks/agents
+```
 
 ## What It Generates
 
@@ -44,6 +54,20 @@ cp /tmp/preflight/agents/preflight.agent.md YOUR_PROJECT/.github/agents/
 | `.github/agents/*.agent.md` | Custom agent profiles (e.g., code reviewer, test specialist) |
 | `.github/.preflight-state.json` | State tracking for idempotent re-runs |
 | `.github/hooks/config-freshness.json` | Session-start hook that reminds you when config needs updating |
+| `.github/hooks/session-logger.json` | Session activity logger for automated skill extraction |
+
+## What's Available After Setup
+
+After running `@preflight`, you have these tools at your disposal:
+
+| Command | What It Does | When to Use |
+|---------|-------------|-------------|
+| `@preflight` | Re-scan and update your Copilot config | When your stack changes, you add frameworks, or config becomes stale |
+| `@preflight` (audit) | Validate existing config, detect stack drift, suggest evidence-based improvements | When you already have config and want to check it |
+| `@skill-extractor` | Extract repeatable patterns from sessions into skills | After 3–5 normal coding sessions with the session-logger hook active |
+| `@code-reviewer` | Review code for bugs and security issues | Before pushing changes (if you created this agent during setup) |
+
+> **How invocation works:** Agents are invoked with `@name` in Copilot chat. Instructions and skills load automatically — no manual invocation needed. The config freshness hook runs silently at session start and reminds you when it's time to re-run.
 
 ## How It Works
 
@@ -68,15 +92,18 @@ preflight/
 │   │   └── scan.ps1                # Windows fast-scan helper
 │   ├── preflight-deep-scan/     # On-demand deep code analysis
 │   │   └── SKILL.md
-│   └── skill-extractor/            # Session pattern analysis & skill generation
-│       ├── SKILL.md
-│       ├── log-tool-call.sh        # Rich logging helper (optional upgrade)
-│       └── log-tool-call.ps1       # Rich logging helper (Windows)
+│   ├── skill-extractor/            # Session pattern analysis & skill generation
+│   │   ├── SKILL.md
+│   │   ├── log-tool-call.sh        # Rich logging helper (optional upgrade)
+│   │   └── log-tool-call.ps1       # Rich logging helper (Windows)
+│   └── preflight-authoring/        # Internal: guides authoring of plugin files
+│       └── SKILL.md
 ├── references/                     # Example files the agent reads & adapts
 │   ├── copilot-instructions/       # Per-stack instruction examples
 │   ├── path-instructions/          # Path-specific instruction examples
 │   ├── agents/                     # Custom agent examples
 │   ├── hooks/                      # Hook config examples
+│   │   ├── config-freshness.json   # Remind when config needs updating
 │   │   ├── guardrails.json         # Block edits to protected paths
 │   │   ├── logging.json            # Session activity logging
 │   │   └── session-logger.json     # Activity logging for skill extraction
@@ -98,17 +125,21 @@ preflight/
 
 ## Roadmap
 
-- **v1 (current):** Agent + scan helpers + reference examples + plugin install.
-- **v2 (in progress):** Session-based skill extraction, hooks generation, MCP config scaffolding.
-- **v3:** Profiles, team-sharing workflows, awesome-copilot marketplace listing.
+- **v1 (current):** Agent + scan + reference examples + plugin install + presets + audit mode + session logging + evidence-based recommendations.
+- **v2 (planned):** MCP config scaffolding, team-sharing workflows.
+- **v3:** Stack affinity mapping, marketplace integration.
 
-## Skill Lifecycle (v2)
+## Skill Lifecycle
 
 The **skill-extractor** manages the full skill lifecycle: extract repeatable patterns from sessions, evaluate existing skills against real usage, improve underperforming skills, and clean up stale ones.
 
+### Session Learning
+
+The session-logger hook captures rich context — file paths, tool arguments, and timing — not just tool names. This enables the skill extractor to detect nuanced patterns like "read test file → edit source → re-run tests" across sessions.
+
 ### How it works
 
-1. **Hooks log tool calls** — A `postToolUse` hook appends each tool call to `.copilot/session-activity.jsonl`
+1. **Hooks log tool calls** — A `postToolUse` hook appends each tool call (with file paths and args) to `.copilot/session-activity.jsonl`
 2. **Agent analyzes patterns** — The `@skill-extractor` agent reads the log and identifies repeated multi-step workflows
 3. **You confirm & save** — Detected patterns are presented for approval, then generated as `.github/skills/` definitions
 4. **Evaluate & improve** — Existing skills are scored against actual usage data for trigger accuracy, workflow drift, and staleness
@@ -123,7 +154,7 @@ cp references/hooks/session-logger.json YOUR_PROJECT/.github/hooks/
 # Add .copilot/ to .gitignore (session logs are ephemeral)
 echo '.copilot/' >> YOUR_PROJECT/.gitignore
 
-# After a few sessions, invoke the skill extractor
+# After 3–5 normal coding sessions (10+ tool calls each), invoke the skill extractor
 @skill-extractor review last session
 ```
 
@@ -134,6 +165,8 @@ echo '.copilot/' >> YOUR_PROJECT/.gitignore
 # Clean up stale or unused skills
 @skill-extractor clean up skills
 ```
+
+> **Minimum data needed:** The skill extractor needs at least 3 sessions with 10+ tool calls each to detect reliable patterns. Quick Q&A sessions don't generate enough data — use it after real coding sessions involving file reads, edits, and test runs.
 
 See `skills/skill-extractor/SKILL.md` for the full workflow and pattern detection heuristics.
 
@@ -146,6 +179,16 @@ preflight can install a lightweight **config freshness hook** that checks at eac
 ```
 
 The hook is opt-in (offered during setup with `default: true`), non-blocking, and benefits all team members once committed.
+
+## Example Output
+
+Want to see what preflight generates before running it? Browse the reference examples:
+
+- **[Repository-wide instructions](references/copilot-instructions/typescript.md)** — What a TypeScript project's `copilot-instructions.md` looks like
+- **[Path-specific instructions](references/path-instructions/react-components.md)** — Rules that activate only for React component files
+- **[Custom agent](references/agents/code-reviewer.agent.md)** — A code review specialist agent
+
+These are complete, working examples that the agent reads and adapts to your specific project.
 
 ## Contributing
 
