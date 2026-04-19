@@ -211,10 +211,13 @@ If the project already has substantial Copilot configuration, use `ask_user` to 
     "properties": {
       "mode": {
         "type": "string",
-        "title": "Setup mode",
+        "title": "How would you like to proceed?",
         "description": "Choose whether to add new config or audit what's already there",
-        "enum": ["Set up from scratch (additive)", "Audit & improve existing config"],
-        "default": "Audit & improve existing config"
+        "oneOf": [
+          { "const": "additive", "title": "Set up from scratch — add new config alongside existing files" },
+          { "const": "audit", "title": "Audit & improve — review existing config and suggest improvements" }
+        ],
+        "default": "audit"
       }
     },
     "required": ["mode"]
@@ -222,8 +225,8 @@ If the project already has substantial Copilot configuration, use `ask_user` to 
 }
 ```
 
-- If the user picks **"Audit & improve existing config"**, switch to audit mode: read existing files, suggest specific improvements, and offer to apply them.
-- If the user picks **"Set up from scratch (additive)"**, proceed normally (additive — never overwrite unmanaged files).
+- If the user picks **"audit"**, switch to audit mode: read existing files, suggest specific improvements, and offer to apply them.
+- If the user picks **"additive"**, proceed normally (additive — never overwrite unmanaged files).
 - If the user **declines** the form, proceed with normal setup.
 
 If the project has no or minimal Copilot configuration, skip this step and proceed normally.
@@ -250,6 +253,8 @@ After presenting the scan results table from 2a, use `ask_user` to offer the dee
 ```
 
 If the user selects **true** (or accepts the default), use the `preflight-deep-scan` skill to analyze naming conventions, import styles, architectural patterns, and code style from linter configs. Incorporate the findings into Phase 3 recommendations.
+
+After the deep scan completes, present the methodology briefly: "I sampled [N] files from [directories]. Here's what I found:" followed by the structured results. This builds trust and lets the user correct misdetections.
 
 If the user selects **false** or **declines** the form, proceed with Phase 3 using only the quick scan data.
 
@@ -280,7 +285,8 @@ Use `ask_user` with a boolean:
     "properties": {
       "create": {
         "type": "boolean",
-        "title": "Create .github/copilot-instructions.md",
+        "title": "Create repository-wide instructions",
+        "description": "Generates .github/copilot-instructions.md with your detected stack, conventions, and architecture so Copilot is project-aware from the start",
         "default": true
       }
     },
@@ -329,11 +335,12 @@ Use `ask_user` with a multi-select array listing all detected instruction files,
       "files": {
         "type": "array",
         "title": "Select which path-specific instructions to create",
+        "description": "Each file activates only for matching file patterns — your Python rules won't load when editing TypeScript",
         "items": {
           "type": "string",
-          "enum": ["typescript.instructions.md — **/*.ts, **/*.tsx", "tests.instructions.md — **/*.test.*, **/*.spec.*", "styles.instructions.md — **/*.css, **/*.scss"]
+          "enum": ["typescript.instructions.md — TypeScript conventions (*.ts, *.tsx)", "tests.instructions.md — Testing patterns and conventions (*.test.*, *.spec.*)", "styles.instructions.md — Styling rules and CSS patterns (*.css, *.scss)"]
         },
-        "default": ["typescript.instructions.md — **/*.ts, **/*.tsx", "tests.instructions.md — **/*.test.*, **/*.spec.*", "styles.instructions.md — **/*.css, **/*.scss"]
+        "default": ["typescript.instructions.md — TypeScript conventions (*.ts, *.tsx)", "tests.instructions.md — Testing patterns and conventions (*.test.*, *.spec.*)", "styles.instructions.md — Styling rules and CSS patterns (*.css, *.scss)"]
       }
     }
   }
@@ -374,11 +381,12 @@ Use `ask_user` with a multi-select array:
       "agents": {
         "type": "array",
         "title": "Select which agents to create",
+        "description": "Each agent is a specialist persona you invoke with @agent-name in Copilot chat",
         "items": {
           "type": "string",
-          "enum": ["code-reviewer.agent.md — Reviews PRs for correctness and style", "test-writer.agent.md — Generates tests following project conventions"]
+          "enum": ["code-reviewer — Reviews PRs for correctness, coverage, and style (@code-reviewer)", "test-writer — Generates tests following project conventions (@test-writer)"]
         },
-        "default": ["code-reviewer.agent.md — Reviews PRs for correctness and style", "test-writer.agent.md — Generates tests following project conventions"]
+        "default": ["code-reviewer — Reviews PRs for correctness, coverage, and style (@code-reviewer)", "test-writer — Generates tests following project conventions (@test-writer)"]
       }
     }
   }
@@ -405,6 +413,7 @@ Use `ask_user` with a boolean:
       "install": {
         "type": "boolean",
         "title": "Install session-logger hook + .gitignore entry",
+        "description": "Tracks tool usage per session (<1ms overhead). After 3-5 sessions, @skill-extractor can analyze patterns and auto-generate reusable skills",
         "default": false
       }
     },
@@ -497,8 +506,8 @@ Use `ask_user` with a structured form:
       },
       "thresholdDays": {
         "type": "integer",
-        "title": "Reminder threshold (days)",
-        "description": "How many days before the reminder appears",
+        "title": "Days before staleness reminder",
+        "description": "How many days of inactivity before suggesting a config refresh",
         "default": 30,
         "minimum": 7,
         "maximum": 365
@@ -617,13 +626,45 @@ it reads your repo-wide rules + TypeScript rules + test rules — all together, 
 2. Commit `.github/` — your whole team benefits immediately
 3. Try `@code-reviewer` (or whichever agents were created) on your next task
 4. Re-run `@preflight` anytime your stack changes — it's idempotent
+
+### 🧰 What's Available Now
+| Command | What It Does | When to Use |
+|---|---|---|
+| `@preflight` | Re-scan and update config | When your stack changes or config is stale |
+| `@skill-extractor` | Extract patterns from sessions into skills | After 3-5 coding sessions (needs session-logger hook) |
+| `@<agent-name>` | <one-line description> | <when to use based on what was created> |
+
+> **Tip:** All agents are invoked with `@name` in Copilot chat. Instructions and skills load automatically — no invocation needed.
 ```
 
-Adapt the table rows to match exactly what was created. Only include rows for files that were actually generated. Use the detected stack values throughout.
+Adapt the table rows to match exactly what was created. Only include rows for files that were actually generated. Use the detected stack values throughout. In the "What's Available Now" table, replace the `@<agent-name>` placeholder rows with one row per agent that was actually created — use the agent's name and description from its YAML frontmatter.
 
 #### 4e. Optional architecture tour
 
-After the summary, offer an optional architecture tour via `ask_user` (enum: "Yes, show me how it all fits together" / "No thanks, I'm good", default: no). If accepted, read `copilot-architecture-class/00-architecture-overview.md` and present a condensed 5-layer overview:
+After the summary, offer an optional architecture tour via `ask_user`:
+
+```json
+{
+  "message": "🏗️ **Architecture Tour**\n\nYou've got a working Copilot setup. Want to see how all the pieces fit together — instructions, agents, hooks, skills, and plugins? It's a quick 5-layer overview.\n\n**Without it:** You know *what* was created but not *why* each layer exists.\n**With it:** You understand the full Copilot extensibility model in 2 minutes.",
+  "requestedSchema": {
+    "properties": {
+      "tour": {
+        "type": "string",
+        "title": "Take a quick architecture tour?",
+        "description": "A 2-minute overview of how instructions, agents, hooks, skills, and plugins compose together",
+        "oneOf": [
+          { "const": "yes", "title": "Yes, show me how it all fits together" },
+          { "const": "no", "title": "No thanks, I'm good" }
+        ],
+        "default": "no"
+      }
+    },
+    "required": ["tour"]
+  }
+}
+```
+
+If accepted, read `copilot-architecture-class/00-architecture-overview.md` and present a condensed 5-layer overview:
 
 1. **Instructions** — Always loaded, shape every response
 2. **Tools** — Built-in actions + MCP server extensions
@@ -689,4 +730,15 @@ Structure: YAML frontmatter (`name`, `description`, `tools`) → identity paragr
 13. **Bridge between categories.** Open each Phase 3 category by connecting it to the previous one (e.g., "You just set up repo-wide instructions. Path-specific instructions go further...").
 14. **Benefit-first, mechanism-second.** Lead with what the user gains, then explain the mechanism. Never lead with the mechanism.
 
+### ask_user Formatting Rules
 
+15. **Structure messages for scanning.** Use this visual hierarchy in every `ask_user` message:
+    - H2 header with one emoji + concept name (e.g., `## 📋 Repository-wide Instructions`)
+    - One-paragraph context (2-3 sentences max) explaining what this is and why it matters for the detected stack
+    - A **Without → With** contrast block using bold labels
+    - Optional: a fenced code preview of what will be generated (3-5 lines max)
+    - End with a transitional sentence connecting to the next category
+16. **Use readable schema fields.** Titles should be human-friendly questions or actions, not technical labels. Bad: `"title": "create"`. Good: `"title": "Create repository-wide instructions"`. Add `description` fields that explain what happens when the user selects this option.
+17. **Keep enum labels self-documenting.** Each option in an enum or multi-select array should read as a complete thought: `"typescript.instructions.md — TypeScript conventions (*.ts, *.tsx)"`, not just `"typescript.instructions.md"`.
+18. **Consistent emoji palette.** Use exactly one emoji per category heading: 📋 instructions, 📂 path-specific, 🤖 agents, ⚡ hooks, 🔄 maintenance, 🔍 deep scan, 🏗️ architecture tour. Do not scatter emojis elsewhere in the message.
+19. **Progressive connection.** Open each category's message by connecting it to the previous one (e.g., "You just set up repo-wide standards. Now let's add file-type-specific rules."). This creates narrative flow.
