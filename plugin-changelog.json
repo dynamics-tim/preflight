@@ -1,6 +1,23 @@
 {
   "_comment": "Maps each plugin release to config improvements. Used by the preflight agent to surface targeted upgrade actions when a version bump is detected between the installed plugin and the version stored in .preflight-state.json.",
   "changelog": {
+    "1.2.2": {
+      "summary": "Removed broken skill-usage tracking — postToolUse hooks lack skill context, so skill-usage.json was always empty. Eval and cleanup workflows now use session activity pattern matching instead.",
+      "configImpacts": [
+        {
+          "type": "breaking_change",
+          "description": "The 2nd sessionEnd step in session-logger.json (skill-usage.json aggregation) has been removed. The step relied on COPILOT_SKILL_NAME and postToolUse skill context, neither of which exist in the hook runtime — resulting in skill-usage.json always being empty.",
+          "affectedFiles": [".github/hooks/session-logger.json"],
+          "recommendation": "Reinstall the session-logger hook to remove the defunct skill-usage aggregation step. Existing session logs are unaffected."
+        },
+        {
+          "type": "improvement",
+          "description": "Skill-extractor evaluation and cleanup workflows now use session activity pattern matching and file pattern validation instead of skill-usage.json metrics — producing accurate results without the broken dependency.",
+          "affectedFiles": [],
+          "recommendation": "No action needed. Re-run @skill-extractor normally — it will use the improved pattern-based approach automatically."
+        }
+      ]
+    },
     "1.2.1": {
       "summary": "Improved skill extractor — session logger now captures intent and search patterns, extractor uses phase-based detection for higher-quality skill candidates.",
       "configImpacts": [

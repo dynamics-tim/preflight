@@ -116,7 +116,7 @@ preflight/
 
 ## Skill Lifecycle
 
-The **skill-extractor** manages the full skill lifecycle: extract repeatable patterns from sessions, evaluate existing skills against real usage, improve underperforming skills, and clean up stale ones.
+The **skill-extractor** manages the full skill lifecycle: extract repeatable patterns from sessions, evaluate existing skills against session activity patterns, improve underperforming skills, and clean up stale ones.
 
 ### Session Learning
 
@@ -127,7 +127,7 @@ The session-logger hook captures rich context — file paths, tool arguments, an
 1. **Hooks log tool calls** — A `postToolUse` hook appends each tool call (with file paths and args) to `.copilot/session-activity.jsonl`
 2. **Agent analyzes patterns** — The `@skill-extractor` agent reads the log and identifies repeated multi-step workflows
 3. **You confirm & save** — Detected patterns are presented for approval, then generated as `.github/skills/` definitions
-4. **Evaluate & improve** — Existing skills are scored against actual usage data for trigger accuracy, workflow drift, and staleness
+4. **Evaluate & improve** — Existing skills are checked against session activity patterns for trigger accuracy, workflow drift, and file pattern staleness
 5. **Clean up** — Unused or stale skills are archived to keep your configuration lean
 
 ### Quick setup
