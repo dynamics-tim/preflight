@@ -22,8 +22,8 @@ The `skill-extractor` skill provides pattern detection heuristics and log format
 Before proceeding with any workflow, assess the available data and set expectations:
 
 - **Minimum for extraction:** 3–5 coding sessions with the session-logger hook active, producing at least 10 tool calls per session. Patterns need 2+ repetitions of 3+ step sequences to be detected.
-- **Minimum for evaluation:** At least one existing skill in `.github/skills/` AND a `.copilot/skill-usage.json` file with usage data from 3+ sessions.
-- **Minimum for cleanup:** Same as evaluation — usage metadata must exist to identify stale skills.
+- **Minimum for evaluation:** At least one existing skill in `.github/skills/` AND session activity data from 3+ sessions (`.copilot/session-activity.jsonl` and `.copilot/session-activity.prev.jsonl`).
+- **Minimum for cleanup:** Same as evaluation — session activity data must exist to assess whether skills are still relevant.
 
 If the data is insufficient, explain clearly what the user needs to do and how long it typically takes: "Install the session-logger hook, work normally for 3–5 sessions, then come back. Each session should involve real coding tasks — quick Q&A sessions don't generate enough tool call patterns."
 
@@ -85,23 +85,21 @@ When the user asks to "evaluate skills", "improve skills", or "audit skills", fo
 
 1. **Inventory existing skills.** Use `glob` to find all `.github/skills/*/SKILL.md` files. Read each one to extract: name, description, workflow steps, file patterns, allowed-tools.
 
-2. **Load usage data.** Read `.copilot/skill-usage.json` if it exists. If missing, tell the user to install the session-logger hook and accumulate a few sessions of data first.
+2. **Load recent session activity.** Read `.copilot/session-activity.jsonl` (and `.copilot/session-activity.prev.jsonl` if available) to understand actual recent usage patterns.
 
-3. **Load recent session activity.** Read `.copilot/session-activity.jsonl` (and `.copilot/session-activity.prev.jsonl` if available) to understand actual recent usage patterns.
+3. **Evaluate each skill.** For every skill in the inventory, assess:
 
-4. **Evaluate each skill.** For every skill in the inventory, assess:
-
-   - **Usage frequency** — Check `useCount` and `lastUsed` from the metadata. Flag skills with `useCount == 0` or `lastUsed` older than 60 days as potentially stale.
-   - **Trigger accuracy** — Compare the skill's `description` field against the actual session contexts where it was loaded. If the skill fires in unexpected contexts (too broad) or fails to fire in expected contexts (too narrow), flag it.
-   - **Workflow drift** — Compare the skill's documented workflow steps against actual tool call sequences from sessions where the skill was active. If users consistently deviate from the documented steps, propose an updated workflow.
+   - **Activity alignment** — Compare the skill's expected workflow steps against actual tool call sequences in recent session logs. If no recent sessions contain tool sequences matching the skill's workflow, flag as potentially unused.
+   - **Trigger accuracy** — Compare the skill's `description` field against the actual session contexts where it would be relevant. If the description seems too broad or too narrow based on session activity patterns, flag it.
+   - **Workflow drift** — Compare the skill's documented workflow steps against actual tool call sequences from sessions that match the skill's expected patterns. If users consistently deviate from the documented steps, propose an updated workflow.
    - **File pattern staleness** — Use `glob` to check whether the skill's declared file patterns still match existing files. Flag patterns that match zero files.
 
-5. **Categorize findings.** Group results into three tiers:
+4. **Categorize findings.** Group results into three tiers:
    - 🔴 **Action needed** — Skill is broken (patterns match nothing) or severely drifted (workflow completely different from actual usage)
    - 🟡 **Improvement available** — Trigger description could be refined, workflow has minor drift, or usage is low
    - 🟢 **Healthy** — Skill is actively used and workflow matches actual patterns
 
-6. **Present findings.** Show a summary table, then for each skill with findings, show:
+5. **Present findings.** Show a summary table, then for each skill with findings, show:
    - Current state vs. proposed improvement
    - Specific changes (quote the current description → proposed description, etc.)
    
@@ -127,9 +125,9 @@ When the user asks to "evaluate skills", "improve skills", or "audit skills", fo
    }
    ```
 
-7. **Apply selected improvements.** Use `edit` to update the selected SKILL.md files. Preserve any content outside managed markers. Update `.copilot/skill-usage.json` to set `lastEvaluated` to the current timestamp and `status` to `active` for evaluated skills. Append a row to the skill's "Revision History" table (create the section if missing) documenting what changed, when, and why — this provides an audit trail for future evaluations.
+6. **Apply selected improvements.** Use `edit` to update the selected SKILL.md files. Preserve any content outside managed markers. Append a row to the skill's "Revision History" table (create the section if missing) documenting what changed, when, and why — this provides an audit trail for future evaluations.
 
-8. **Summarize changes.** List what was updated and remind the user to commit the changes.
+7. **Summarize changes.** List what was updated and remind the user to commit the changes.
 
 ## Generalization Rules
 
@@ -144,12 +142,11 @@ When converting specific session activity into reusable skill definitions:
 
 When the user asks to "clean up skills", "remove stale skills", or "archive unused skills", follow this workflow.
 
-1. **Inventory skills and usage data.** Same as evaluation steps 1-2 — read all skills and `.copilot/skill-usage.json`.
+1. **Inventory skills and session data.** Same as evaluation steps 1-2 — read all skills and recent session activity logs.
 
 2. **Identify cleanup candidates.** Flag skills that meet ANY of these criteria:
-   - `useCount == 0` (never used since tracking began)
-   - `lastUsed` older than 60 days
-   - `status == "needs-review"` and `lastEvaluated` is older than 30 days (reviewed but not acted on)
+   - No recent session activity matches the skill's expected workflow (skill appears unused)
+   - Skill file hasn't been modified in over 60 days and no session patterns match its workflow
    - File patterns match zero existing files (completely stale)
 
 3. **Present candidates.** Use `ask_user` with a multi-select listing each candidate with its reason:
@@ -165,7 +162,7 @@ When the user asks to "clean up skills", "remove stale skills", or "archive unus
            "description": "Archived skills are moved to .copilot/archived-skills/ — recoverable, not deleted.",
            "items": {
              "type": "string",
-             "enum": ["<skill-name> — <reason: e.g., unused (0 invocations), last used 75 days ago>"]
+             "enum": ["<skill-name> — <reason: e.g., no matching session activity, file patterns match nothing, not modified in 90 days>"]
            }
          }
        }
@@ -176,7 +173,6 @@ When the user asks to "clean up skills", "remove stale skills", or "archive unus
 4. **Archive selected skills.** For each confirmed skill:
    - Create `.copilot/archived-skills/` directory if it doesn't exist
    - Move the entire `.github/skills/<name>/` directory to `.copilot/archived-skills/<name>/`
-   - Update `.copilot/skill-usage.json` to set `status: "archived"` for the skill
 
 5. **Summarize.** List what was archived and note they can be restored by moving back to `.github/skills/`.
 

@@ -100,54 +100,12 @@ Find recurring `execute` commands with different arguments. Parameterize:
 - Never create skills without user confirmation
 - Skip patterns with fewer than 3 steps or fewer than 10 log entries total
 
-## Skill Usage Metadata
-
-The session-logger hook tracks skill invocations in `.copilot/skill-usage.json`.
-
-### Schema
-
-```json
-{
-  "skills": {
-    "<skill-name>": {
-      "created": "2026-04-10T14:00:00Z",
-      "lastUsed": "2026-04-17T09:30:00Z",
-      "useCount": 12,
-      "lastEvaluated": "2026-04-15T11:00:00Z",
-      "status": "active"
-    }
-  }
-}
-```
-
-### Fields
-
-| Field | Type | Description |
-|---|---|---|
-| `created` | ISO 8601 | When the skill was first tracked (may differ from file creation) |
-| `lastUsed` | ISO 8601 | Last session where this skill was auto-matched |
-| `useCount` | integer | Total number of sessions where this skill was loaded |
-| `lastEvaluated` | ISO 8601 or null | When the skill was last reviewed by the evaluation workflow |
-| `status` | string | One of: `active`, `archived`, `needs-review` |
-
-### Status Values
-
-- **active** — Skill is in use and healthy
-- **needs-review** — Flagged by evaluation (trigger issues, workflow drift, or unused)
-- **archived** — User chose to retire the skill (file moved to `.copilot/archived-skills/`)
-
-### Staleness Heuristics
-
-- **Unused**: `useCount == 0` or `lastUsed` older than 60 days
-- **Needs evaluation**: `lastEvaluated` is null or older than 30 days, AND `useCount > 0`
-- **Possibly stale**: Skill file patterns reference paths that no longer exist in the project
-
 ## Evaluation Heuristics
 
 ### Trigger Accuracy Assessment
 
-- **Too broad**: Skill loads in sessions where its workflow isn't relevant — check the `skill` field in session log against actual tool calls. If the session doesn't follow the skill's workflow, the trigger description is too broad.
-- **Too narrow**: Skill never loads despite matching activity patterns — compare session tool sequences against the skill's workflow. If sessions follow the pattern but the skill isn't loaded, the description is too narrow.
+- **Too broad**: Skill's `description` matches sessions where its workflow isn't relevant — compare the skill's expected tool sequence against actual tool calls in recent sessions. If sessions that match the description don't follow the skill's workflow, the trigger is too broad.
+- **Too narrow**: Skill never activates despite matching activity patterns — compare session tool sequences against the skill's workflow. If sessions follow the pattern but the description doesn't match, it's too narrow.
 - **Fix**: Adjust the `description` field in the skill's frontmatter. Add qualifying terms to narrow a too-broad trigger; remove restrictive terms to widen a too-narrow trigger.
 
 ### Workflow Drift Detection

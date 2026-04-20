@@ -22,7 +22,6 @@ mkdir -p "$LOG_DIR"
 
 TOOL_NAME="${COPILOT_TOOL_NAME:-unknown}"
 TOOL_ARGS="${COPILOT_TOOL_ARGS:-{}}"
-SKILL_NAME="${COPILOT_SKILL_NAME:-}"
 TIMESTAMP=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
 
 # Extract file path from common tool arg patterns
@@ -53,9 +52,5 @@ json_escape() {
 ESCAPED_PATH=$(json_escape "$FILE_PATH")
 ESCAPED_SUMMARY=$(json_escape "$ARGS_SUMMARY")
 
-# Build optional skill field
-SKILL_PART=""
-[ -n "$SKILL_NAME" ] && SKILL_PART=",\"skill\":\"$(json_escape "$SKILL_NAME")\""
-
 # Append JSONL entry (one line, no trailing newline issues)
-echo "{\"ts\":\"$TIMESTAMP\",\"tool\":\"$TOOL_NAME\",\"path\":\"$ESCAPED_PATH\",\"args_summary\":\"$ESCAPED_SUMMARY\"$SKILL_PART}" >> "$LOG_FILE"
+echo "{\"ts\":\"$TIMESTAMP\",\"tool\":\"$TOOL_NAME\",\"path\":\"$ESCAPED_PATH\",\"args_summary\":\"$ESCAPED_SUMMARY\"}" >> "$LOG_FILE"
