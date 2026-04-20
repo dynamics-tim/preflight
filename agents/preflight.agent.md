@@ -176,6 +176,26 @@ Use `glob` for:
 - `.stylelintrc*`
 - `golangci-lint` config
 
+#### 1i. Check for plugin updates
+
+The current installed version of preflight is **CURRENT_PLUGIN_VERSION = "1.2.0"**.
+
+Silently perform two checks:
+
+**Remote check — is this plugin version outdated?**
+
+Use the `web` tool to fetch `https://api.github.com/repos/dynamics-tim/preflight/releases/latest`. Extract the `tag_name` field (strip leading `v` if present, e.g., `v1.2.0` → `1.2.0`). Store as `latestVersion`. If the fetch fails for any reason (network error, rate limit, non-200 response), set `latestVersion = null` and proceed silently — never surface an error to the user.
+
+Compare: if `latestVersion` is not null and `latestVersion` > `CURRENT_PLUGIN_VERSION` → flag as **plugin_outdated = true**.
+
+**Version drift check — are this project's configs from an older plugin version?**
+
+Read `.github/.preflight-state.json` if it exists (already discovered in step 1f). Extract the `pluginVersion` field. Store as `stateVersion`. If the file doesn't exist or `pluginVersion` is missing, set `stateVersion = null`.
+
+Compare: if `stateVersion` is not null and `stateVersion` < `CURRENT_PLUGIN_VERSION` → flag as **config_stale = true**.
+
+Store all four values (`latestVersion`, `CURRENT_PLUGIN_VERSION`, `stateVersion`, `plugin_outdated`, `config_stale`) for use in Phase 2 step 2d.
+
 ---
 
 ### PHASE 2 — Report & Deep Scan Offer
@@ -272,6 +292,54 @@ If the user selects **true** (or accepts the default), use the `preflight-deep-s
 After the deep scan completes, present the methodology briefly: "I sampled [N] files from [directories]. Here's what I found:" followed by the structured results. This builds trust and lets the user correct misdetections.
 
 If the user selects **false** or **declines** the form, proceed with Phase 3 using only the quick scan data.
+
+#### 2d. Plugin update notification
+
+Run this step only if `plugin_outdated = true` OR `config_stale = true`. Otherwise skip silently.
+
+**Scenario A — Plugin itself is outdated** (`plugin_outdated = true`):
+
+Show an inline banner (plain text, no `ask_user` needed):
+
+```
+⬆️  **preflight update available** — you're running v<CURRENT_PLUGIN_VERSION>, latest is v<latestVersion>.
+Run `copilot plugin install dynamics-tim/preflight` to get the latest features, then re-run `@preflight`.
+```
+
+Do not block the workflow. Continue to Scenario B check or proceed to Phase 3 if neither applies.
+
+**Scenario B — Project configs were scaffolded by an older plugin version** (`config_stale = true`):
+
+Read `plugin-changelog.json` from the plugin's own repo root. Collect all `configImpacts` entries for versions between `stateVersion` (exclusive) and `CURRENT_PLUGIN_VERSION` (inclusive), in ascending version order. If `stateVersion = null` (no `pluginVersion` in the state file), surface all entries from all versions.
+
+Use `ask_user` to present the available upgrades and let the user choose how to proceed:
+
+```json
+{
+  "message": "🔄 **Plugin update detected** — your Copilot config was set up with preflight v<stateVersion>, but you're now running v<CURRENT_PLUGIN_VERSION>.\n\nHere's what's new since your last setup:\n\n<list each configImpact as a bullet: \"• <description>\">\n\nYou can apply individual improvements now or run a full audit to catch all gaps.",
+  "requestedSchema": {
+    "properties": {
+      "action": {
+        "type": "string",
+        "title": "How would you like to proceed?",
+        "oneOf": [
+          { "const": "apply", "title": "Apply new features — walk me through each improvement one by one" },
+          { "const": "audit", "title": "Full audit — compare current scan against stored stack and suggest all improvements" },
+          { "const": "skip", "title": "Skip — continue with the normal setup flow" }
+        ],
+        "default": "apply"
+      }
+    },
+    "required": ["action"]
+  }
+}
+```
+
+- If **"apply"**: For each `configImpact` in the collected list (in order), use `ask_user` with a boolean to offer applying that specific improvement. Use the `description` and `recommendation` fields from `plugin-changelog.json` as the message content. After confirming each item, scaffold it immediately following the same Phase 4 merge strategy (check for existing files, respect managed markers).
+
+- If **"audit"**: Run the audit workflow from step 2b (validate managed files, compare detected stack against `detectedStack` in state, report drift, suggest improvements).
+
+- If **"skip"** or the user **declines** the form: proceed to Phase 3 normally.
 
 ---
 
@@ -548,6 +616,7 @@ After all files are created, create or update `.github/.preflight-state.json`:
 ```json
 {
   "version": "1.0.0",
+  "pluginVersion": "1.2.0",
   "lastRun": "<ISO 8601 timestamp>",
   "detectedStack": {
     "languages": ["typescript"],
@@ -564,7 +633,9 @@ After all files are created, create or update `.github/.preflight-state.json`:
 }
 ```
 
-If `.preflight-state.json` already exists, update it (merge `managedFiles`, update `lastRun` and `detectedStack`).
+- `pluginVersion` — always set to `CURRENT_PLUGIN_VERSION` ("1.2.0"). This is what future runs compare against to detect version drift and surface config improvements from newer plugin releases.
+
+If `.preflight-state.json` already exists, update it (merge `managedFiles`, update `lastRun`, `detectedStack`, and `pluginVersion`).
 
 #### 4d. Final summary
 

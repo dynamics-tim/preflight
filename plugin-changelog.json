@@ -1,0 +1,49 @@
+{
+  "_comment": "Maps each plugin release to config improvements. Used by the preflight agent to surface targeted upgrade actions when a version bump is detected between the installed plugin and the version stored in .preflight-state.json.",
+  "changelog": {
+    "1.2.0": {
+      "summary": "Added plugin update detection — preflight now checks for newer releases and surfaces config improvements when the plugin has been updated since your last setup.",
+      "configImpacts": [
+        {
+          "type": "new_feature",
+          "description": "Plugin update detection — preflight now compares the installed version against the latest GitHub release and against the version stored in your project's .preflight-state.json.",
+          "affectedFiles": [".github/.preflight-state.json"],
+          "recommendation": "Re-run @preflight to start tracking pluginVersion in your state file. Future re-runs will detect version drift and surface targeted upgrade suggestions automatically."
+        }
+      ]
+    },
+    "1.1.0": {
+      "summary": "Added session learning hooks, config freshness checker, and audit mode with stack-drift detection.",
+      "configImpacts": [
+        {
+          "type": "new_feature",
+          "description": "Session-logger hook — tracks tool usage per session (<1ms overhead). Enables @skill-extractor to analyze patterns and auto-generate reusable skills after 3-5 sessions.",
+          "affectedFiles": [".github/hooks/session-logger.json"],
+          "recommendation": "Install if you want @skill-extractor to extract workflow patterns into reusable skills over time."
+        },
+        {
+          "type": "new_feature",
+          "description": "Config-freshness hook — shows a one-line reminder at session start when Copilot config is stale (configurable threshold, default 30 days).",
+          "affectedFiles": [".github/hooks/config-freshness.json"],
+          "recommendation": "Install to ensure your team is reminded to re-run @preflight when the config ages."
+        },
+        {
+          "type": "improvement",
+          "description": "Audit mode — detects stack drift between current scan and stored .preflight-state.json (e.g., framework changes, new test tools). Surfaces evidence-backed improvement suggestions.",
+          "affectedFiles": [".github/.preflight-state.json"],
+          "recommendation": "Re-run @preflight and choose 'Audit & improve' to surface any stack drift since your last setup."
+        },
+        {
+          "type": "improvement",
+          "description": "Deep scan offer — analyses naming conventions, import styles, and architectural patterns from linter configs to generate more precise instructions.",
+          "affectedFiles": [],
+          "recommendation": "Re-run @preflight and accept the deep scan offer to improve instruction specificity."
+        }
+      ]
+    },
+    "1.0.0": {
+      "summary": "Initial release — repo-wide instructions, path-specific instructions, custom agents, basic state tracking.",
+      "configImpacts": []
+    }
+  }
+}
