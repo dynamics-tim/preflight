@@ -110,11 +110,11 @@ Find recurring `execute` commands with different arguments. Parameterize:
 
 ### Workflow Drift Detection
 
-- Compare each skill's documented workflow steps against actual tool call sequences from sessions where the skill was active.
+- Compare each skill's documented workflow steps against actual tool call sequences from sessions whose tool patterns match the skill's workflow.
 - **Missing steps**: Users consistently perform an extra step not in the skill's workflow → propose adding it.
 - **Skipped steps**: Users consistently skip a documented step → consider removing or marking it optional.
 - **Reordered steps**: Actual order differs >50% of the time → propose reordering the workflow.
-- Minimum data: require 3+ sessions with the skill active before flagging drift.
+- Minimum data: require 3+ sessions with matching tool patterns before flagging drift.
 
 ### File Pattern Validation
 
