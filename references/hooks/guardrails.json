@@ -1,76 +1,42 @@
 {
   "version": 1,
+  "_comment": "Guardrail hooks that block or warn on dangerous tool uses. Each step reads stdin JSON with toolName and toolArgs, then outputs a deny decision if the condition matches.",
   "hooks": {
     "preToolUse": [
       {
-        "event": "preToolUse",
-        "steps": [
-          {
-            "type": "gate",
-            "condition": {
-              "toolName": "editFile",
-              "pathGlob": "*.lock"
-            },
-            "action": "reject",
-            "message": "Lock files should not be edited directly. Update package.json and run the package manager instead."
-          }
-        ]
+        "_comment": "Block editing lock files — use the package manager instead",
+        "type": "command",
+        "bash": "INPUT=$(cat); TOOL=$(echo \"$INPUT\" | jq -r '.toolName'); ARGS=$(echo \"$INPUT\" | jq -r '.toolArgs'); if [ \"$TOOL\" = \"edit\" ] && echo \"$ARGS\" | jq -r '.path' 2>/dev/null | grep -q '\\.lock$'; then echo '{\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"Lock files should not be edited directly. Update package.json and run the package manager instead.\"}'; fi",
+        "powershell": "$in=[Console]::In.ReadToEnd()|ConvertFrom-Json; if($in.toolName -eq 'edit'){ try{$a=$in.toolArgs|ConvertFrom-Json; if($a.path -match '\\.lock$'){@{permissionDecision='deny';permissionDecisionReason='Lock files should not be edited directly. Update package.json and run the package manager instead.'}|ConvertTo-Json -Compress}}catch{} }",
+        "timeoutSec": 5
       },
       {
-        "event": "preToolUse",
-        "steps": [
-          {
-            "type": "gate",
-            "condition": {
-              "toolName": "editFile",
-              "pathGlob": "dist/**"
-            },
-            "action": "reject",
-            "message": "The dist/ directory contains build artifacts. Edit source files and rebuild instead."
-          }
-        ]
+        "_comment": "Block editing dist/ build artifacts — edit source and rebuild",
+        "type": "command",
+        "bash": "INPUT=$(cat); TOOL=$(echo \"$INPUT\" | jq -r '.toolName'); ARGS=$(echo \"$INPUT\" | jq -r '.toolArgs'); if [ \"$TOOL\" = \"edit\" ] && echo \"$ARGS\" | jq -r '.path' 2>/dev/null | grep -q '^dist/'; then echo '{\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"The dist/ directory contains build artifacts. Edit source files and rebuild instead.\"}'; fi",
+        "powershell": "$in=[Console]::In.ReadToEnd()|ConvertFrom-Json; if($in.toolName -eq 'edit'){ try{$a=$in.toolArgs|ConvertFrom-Json; if($a.path -match '^dist[\\\\/]'){@{permissionDecision='deny';permissionDecisionReason='The dist/ directory contains build artifacts. Edit source files and rebuild instead.'}|ConvertTo-Json -Compress}}catch{} }",
+        "timeoutSec": 5
       },
       {
-        "event": "preToolUse",
-        "steps": [
-          {
-            "type": "gate",
-            "condition": {
-              "toolName": "runTerminalCommand",
-              "commandPattern": "rm -rf"
-            },
-            "action": "warn",
-            "message": "Destructive command detected: rm -rf. Confirm this is intentional."
-          }
-        ]
+        "_comment": "Warn on rm -rf commands — destructive operation",
+        "type": "command",
+        "bash": "INPUT=$(cat); TOOL=$(echo \"$INPUT\" | jq -r '.toolName'); ARGS=$(echo \"$INPUT\" | jq -r '.toolArgs'); if [ \"$TOOL\" = \"bash\" ] && echo \"$ARGS\" | jq -r '.command' 2>/dev/null | grep -q 'rm -rf'; then echo '{\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"Destructive command detected: rm -rf. Confirm this is intentional.\"}'; fi",
+        "powershell": "$in=[Console]::In.ReadToEnd()|ConvertFrom-Json; if($in.toolName -eq 'bash'){ try{$a=$in.toolArgs|ConvertFrom-Json; if($a.command -match 'rm -rf'){@{permissionDecision='deny';permissionDecisionReason='Destructive command detected: rm -rf. Confirm this is intentional.'}|ConvertTo-Json -Compress}}catch{} }",
+        "timeoutSec": 5
       },
       {
-        "event": "preToolUse",
-        "steps": [
-          {
-            "type": "gate",
-            "condition": {
-              "toolName": "runTerminalCommand",
-              "commandPattern": "DROP"
-            },
-            "action": "warn",
-            "message": "SQL DROP statement detected. Confirm this is intentional and not targeting production."
-          }
-        ]
+        "_comment": "Warn on SQL DROP statements — potential data loss",
+        "type": "command",
+        "bash": "INPUT=$(cat); TOOL=$(echo \"$INPUT\" | jq -r '.toolName'); ARGS=$(echo \"$INPUT\" | jq -r '.toolArgs'); if [ \"$TOOL\" = \"bash\" ] && echo \"$ARGS\" | jq -r '.command' 2>/dev/null | grep -qi 'DROP'; then echo '{\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"SQL DROP statement detected. Confirm this is intentional and not targeting production.\"}'; fi",
+        "powershell": "$in=[Console]::In.ReadToEnd()|ConvertFrom-Json; if($in.toolName -eq 'bash'){ try{$a=$in.toolArgs|ConvertFrom-Json; if($a.command -match '(?i)DROP'){@{permissionDecision='deny';permissionDecisionReason='SQL DROP statement detected. Confirm this is intentional and not targeting production.'}|ConvertTo-Json -Compress}}catch{} }",
+        "timeoutSec": 5
       },
       {
-        "event": "preToolUse",
-        "steps": [
-          {
-            "type": "gate",
-            "condition": {
-              "toolName": "runTerminalCommand",
-              "commandPattern": "Remove-Item.*-Recurse.*-Force"
-            },
-            "action": "warn",
-            "message": "Destructive PowerShell command detected: Remove-Item -Recurse -Force. Confirm this is intentional."
-          }
-        ]
+        "_comment": "Warn on PowerShell Remove-Item -Recurse -Force — destructive operation",
+        "type": "command",
+        "bash": "INPUT=$(cat); TOOL=$(echo \"$INPUT\" | jq -r '.toolName'); ARGS=$(echo \"$INPUT\" | jq -r '.toolArgs'); if [ \"$TOOL\" = \"bash\" ] && echo \"$ARGS\" | jq -r '.command' 2>/dev/null | grep -q 'Remove-Item.*-Recurse.*-Force'; then echo '{\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"Destructive PowerShell command detected: Remove-Item -Recurse -Force. Confirm this is intentional.\"}'; fi",
+        "powershell": "$in=[Console]::In.ReadToEnd()|ConvertFrom-Json; if($in.toolName -eq 'bash'){ try{$a=$in.toolArgs|ConvertFrom-Json; if($a.command -match 'Remove-Item.*-Recurse.*-Force'){@{permissionDecision='deny';permissionDecisionReason='Destructive PowerShell command detected: Remove-Item -Recurse -Force. Confirm this is intentional.'}|ConvertTo-Json -Compress}}catch{} }",
+        "timeoutSec": 5
       }
     ]
   }

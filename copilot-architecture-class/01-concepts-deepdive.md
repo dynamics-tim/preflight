@@ -446,9 +446,9 @@ Hooks are defined in JSON files at: `.github/hooks/*.json`
 
 ### Key Points
 
-- **`preToolUse` can block tool execution** — if the command exits with a non-zero code, the tool call is cancelled. This is your primary guardrail mechanism.
+- **`preToolUse` can block tool execution** — output a JSON object with `"permissionDecision": "deny"` to cancel the tool call. This is your primary guardrail mechanism.
 - **Default timeout is 30 seconds.** Adjust with `timeoutSec` for longer-running hooks.
-- Hooks receive **context via environment variables** — tool name, arguments, file paths, etc.
+- Hooks receive **context via JSON on stdin** — tool name, arguments, results, etc. Read with `INPUT=$(cat)` in bash or `[Console]::In.ReadToEnd()` in PowerShell.
 - You can define **both `bash` and `powershell`** commands; the correct one runs based on the OS.
 - Hooks can reference **external scripts** for complex logic.
 - Multiple hook files in `.github/hooks/` are all loaded and merged.
@@ -483,16 +483,16 @@ File: `.github/hooks/guardrails.json`
     "preToolUse": [
       {
         "type": "command",
-        "bash": "if echo \"$COPILOT_TOOL_ARGS\" | grep -qE '(\\.env|secrets\\.json|prod\\.config)'; then echo 'BLOCKED: Cannot modify sensitive files' >&2; exit 1; fi",
-        "powershell": "if ($env:COPILOT_TOOL_ARGS -match '(\\.env|secrets\\.json|prod\\.config)') { Write-Error 'BLOCKED: Cannot modify sensitive files'; exit 1 }",
+        "bash": "INPUT=$(cat); ARGS=$(echo \"$INPUT\" | jq -r '.toolArgs'); if echo \"$ARGS\" | grep -qE '(\\.env|secrets\\.json|prod\\.config)'; then echo '{\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"Cannot modify sensitive files\"}'; fi",
+        "powershell": "$input = [Console]::In.ReadToEnd(); $data = $input | ConvertFrom-Json; if ($data.toolArgs -match '(\\.env|secrets\\.json|prod\\.config)') { Write-Output '{\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"Cannot modify sensitive files\"}' }",
         "timeoutSec": 5
       }
     ],
     "postToolUse": [
       {
         "type": "command",
-        "bash": "echo \"[$(date -u +%Y-%m-%dT%H:%M:%SZ)] Tool: $COPILOT_TOOL_NAME\" >> .copilot-audit.log",
-        "powershell": "Add-Content -Path .copilot-audit.log -Value \"[$(Get-Date -Format o)] Tool: $env:COPILOT_TOOL_NAME\"",
+        "bash": "INPUT=$(cat); TOOL=$(echo \"$INPUT\" | jq -r '.toolName'); echo \"[$(date -u +%Y-%m-%dT%H:%M:%SZ)] Tool: $TOOL\" >> .copilot-audit.log",
+        "powershell": "$input = [Console]::In.ReadToEnd(); $data = $input | ConvertFrom-Json; Add-Content -Path .copilot-audit.log -Value \"[$(Get-Date -Format o)] Tool: $($data.toolName)\"",
         "timeoutSec": 5
       }
     ]
@@ -505,7 +505,7 @@ File: `.github/hooks/guardrails.json`
 - **Start with logging hooks** before enforcement hooks. Understand what Copilot is doing before blocking it.
 - **Keep hooks fast.** A slow `preToolUse` hook delays every single tool call. Target under 1 second.
 - **Use `preToolUse` sparingly.** Over-restrictive hooks make Copilot unable to work effectively — it'll keep hitting blocks and waste context retrying.
-- **Test hooks manually** by running the shell commands yourself with sample environment variables.
+- **Test hooks locally** by piping sample JSON: `echo '{"toolName":"edit","toolArgs":"{\"path\":\"test.lock\"}"}' | ./scripts/check-guardrails.sh`
 - **External scripts** are easier to maintain than inline shell in JSON. Reference them: `"bash": "./scripts/check-guardrails.sh"`.
 
 ---

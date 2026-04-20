@@ -3,30 +3,18 @@
   "hooks": {
     "sessionStart": [
       {
-        "event": "sessionStart",
-        "steps": [
-          {
-            "type": "command",
-            "command": {
-              "bash": "echo \"[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Session started — $(basename \"$PWD\")\" >> .copilot/session.log",
-              "powershell": "Add-Content -Path .copilot/session.log -Value \"[$((Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ'))] Session started — $(Split-Path -Leaf (Get-Location))\""
-            }
-          }
-        ]
+        "type": "command",
+        "bash": "echo \"[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Session started — $(basename \"$PWD\")\" >> .copilot/session.log",
+        "powershell": "Add-Content -Path .copilot/session.log -Value \"[$((Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ'))] Session started — $(Split-Path -Leaf (Get-Location))\"",
+        "timeoutSec": 5
       }
     ],
     "sessionEnd": [
       {
-        "event": "sessionEnd",
-        "steps": [
-          {
-            "type": "command",
-            "command": {
-              "bash": "echo \"[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Session ended\" >> .copilot/session.log",
-              "powershell": "Add-Content -Path .copilot/session.log -Value \"[$((Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ'))] Session ended\""
-            }
-          }
-        ]
+        "type": "command",
+        "bash": "echo \"[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Session ended\" >> .copilot/session.log",
+        "powershell": "Add-Content -Path .copilot/session.log -Value \"[$((Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ'))] Session ended\"",
+        "timeoutSec": 5
       }
     ]
   }

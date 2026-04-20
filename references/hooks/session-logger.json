@@ -1,58 +1,35 @@
 {
   "version": 1,
-  "_comment": "Session activity logger for skill extraction. Add .copilot/ to your .gitignore — logs are ephemeral.",
+  "_comment": "Session activity logger for skill extraction. Add .copilot/ to your .gitignore — logs are ephemeral. Hooks receive context as JSON via stdin.",
   "hooks": {
     "sessionStart": [
       {
-        "event": "sessionStart",
-        "steps": [
-          {
-            "type": "command",
-            "command": {
-              "bash": "mkdir -p .copilot && [ -f .copilot/session-activity.jsonl ] && mv .copilot/session-activity.jsonl .copilot/session-activity.prev.jsonl 2>/dev/null; echo '{\"ts\":\"'$(date -u '+%Y-%m-%dT%H:%M:%SZ')'\",\"event\":\"session_start\",\"cwd\":\"'$(basename \"$PWD\")'\"}' >> .copilot/session-activity.jsonl && [ -f .copilot/pending-skill-review ] && echo '[skill-extractor] Previous session has unreviewed patterns — say \"review last session\" to extract skills, or \"evaluate skills\" to improve existing ones.' >&2 || true",
-              "powershell": "if (-not (Test-Path .copilot)) { New-Item -ItemType Directory -Path .copilot -Force | Out-Null }; if (Test-Path .copilot/session-activity.jsonl) { Move-Item .copilot/session-activity.jsonl .copilot/session-activity.prev.jsonl -Force }; $ts = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ'); Add-Content -Path .copilot/session-activity.jsonl -Value ('{\"ts\":\"' + $ts + '\",\"event\":\"session_start\",\"cwd\":\"' + (Split-Path -Leaf (Get-Location)) + '\"}') -Encoding UTF8; if (Test-Path .copilot/pending-skill-review) { Write-Host '[skill-extractor] Previous session has unreviewed patterns - say \"review last session\" to extract skills, or \"evaluate skills\" to improve existing ones.' }"
-            },
-            "timeoutSec": 5
-          }
-        ]
+        "type": "command",
+        "bash": "mkdir -p .copilot && [ -f .copilot/session-activity.jsonl ] && mv .copilot/session-activity.jsonl .copilot/session-activity.prev.jsonl 2>/dev/null; echo '{\"ts\":\"'$(date -u '+%Y-%m-%dT%H:%M:%SZ')'\",\"event\":\"session_start\",\"cwd\":\"'$(basename \"$PWD\")'\"}' >> .copilot/session-activity.jsonl && [ -f .copilot/pending-skill-review ] && echo '[skill-extractor] Previous session has unreviewed patterns — say \"review last session\" to extract skills, or \"evaluate skills\" to improve existing ones.' >&2 || true",
+        "powershell": "if (-not (Test-Path .copilot)) { New-Item -ItemType Directory -Path .copilot -Force | Out-Null }; if (Test-Path .copilot/session-activity.jsonl) { Move-Item .copilot/session-activity.jsonl .copilot/session-activity.prev.jsonl -Force }; $ts = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ'); Add-Content -Path .copilot/session-activity.jsonl -Value ('{\"ts\":\"' + $ts + '\",\"event\":\"session_start\",\"cwd\":\"' + (Split-Path -Leaf (Get-Location)) + '\"}') -Encoding UTF8; if (Test-Path .copilot/pending-skill-review) { Write-Host '[skill-extractor] Previous session has unreviewed patterns - say \"review last session\" to extract skills, or \"evaluate skills\" to improve existing ones.' }",
+        "timeoutSec": 5
       }
     ],
     "postToolUse": [
       {
-        "event": "postToolUse",
-        "steps": [
-          {
-            "type": "command",
-            "command": {
-              "bash": "mkdir -p .copilot && P=\"\"; if [ -n \"${COPILOT_TOOL_ARGS:-}\" ]; then P=$(echo \"$COPILOT_TOOL_ARGS\" | grep -o '\"path\" *: *\"[^\"]*\"' | head -1 | sed 's/\"path\" *: *\"//;s/\"$//') 2>/dev/null || P=\"\"; fi; FP=\"\"; [ -n \"$P\" ] && FP=\",\\\"path\\\":\\\"${P}\\\"\"; S=\"\"; [ -n \"${COPILOT_SKILL_NAME:-}\" ] && S=\",\\\"skill\\\":\\\"${COPILOT_SKILL_NAME}\\\"\"; echo '{\"ts\":\"'$(date -u '+%Y-%m-%dT%H:%M:%SZ')'\",\"tool\":\"'${COPILOT_TOOL_NAME:-unknown}'\"'\"$FP\"\"$S\"'}' >> .copilot/session-activity.jsonl 2>/dev/null || true",
-              "powershell": "try { if (-not (Test-Path .copilot)) { New-Item -ItemType Directory -Path .copilot -Force | Out-Null }; $tool = if ($env:COPILOT_TOOL_NAME) { $env:COPILOT_TOOL_NAME } else { 'unknown' }; $fp = ''; try { if ($env:COPILOT_TOOL_ARGS) { $parsed = $env:COPILOT_TOOL_ARGS | ConvertFrom-Json; if ($parsed.path) { $fp = ',\"path\":\"' + ($parsed.path -replace '\\','\\\\') + '\"' } } } catch {}; $sk = ''; if ($env:COPILOT_SKILL_NAME) { $sk = ',\"skill\":\"' + $env:COPILOT_SKILL_NAME + '\"' }; Add-Content -Path .copilot/session-activity.jsonl -Value ('{\"ts\":\"' + (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ') + '\",\"tool\":\"' + $tool + '\"' + $fp + $sk + '}') -Encoding UTF8 } catch {}"
-            },
-            "timeoutSec": 5
-          }
-        ]
+        "type": "command",
+        "bash": "INPUT=$(cat); TOOL=$(echo \"$INPUT\" | jq -r '.toolName // \"unknown\"'); ARGS=$(echo \"$INPUT\" | jq -r '.toolArgs // \"\"'); P=$(echo \"$ARGS\" | jq -r '.path // empty' 2>/dev/null) || P=''; FP=''; [ -n \"$P\" ] && FP=',\"path\":\"'\"$P\"'\"'; mkdir -p .copilot && echo '{\"ts\":\"'$(date -u '+%Y-%m-%dT%H:%M:%SZ')'\",\"tool\":\"'\"$TOOL\"'\"'\"$FP\"'}' >> .copilot/session-activity.jsonl 2>/dev/null || true",
+        "powershell": "try { $in = [Console]::In.ReadToEnd() | ConvertFrom-Json; $tool = if ($in.toolName) { $in.toolName } else { 'unknown' }; $fp = ''; try { $args2 = $in.toolArgs | ConvertFrom-Json; if ($args2.path) { $fp = ',\"path\":\"' + ($args2.path -replace '\\\\','\\\\') + '\"' } } catch {}; if (-not (Test-Path .copilot)) { New-Item -ItemType Directory -Path .copilot -Force | Out-Null }; Add-Content -Path .copilot/session-activity.jsonl -Value ('{\"ts\":\"' + (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ') + '\",\"tool\":\"' + $tool + '\"' + $fp + '}') -Encoding UTF8 } catch {}",
+        "timeoutSec": 5
       }
     ],
     "sessionEnd": [
       {
-        "event": "sessionEnd",
-        "steps": [
-          {
-            "type": "command",
-            "command": {
-              "bash": "mkdir -p .copilot && echo '{\"ts\":\"'$(date -u '+%Y-%m-%dT%H:%M:%SZ')'\",\"event\":\"session_end\"}' >> .copilot/session-activity.jsonl && LC=$(wc -l < .copilot/session-activity.jsonl 2>/dev/null || echo 0) && [ \"$LC\" -ge 10 ] && echo 'review' > .copilot/pending-skill-review || true",
-              "powershell": "if (-not (Test-Path .copilot)) { New-Item -ItemType Directory -Path .copilot -Force | Out-Null }; Add-Content -Path .copilot/session-activity.jsonl -Value ('{\"ts\":\"' + (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ') + '\",\"event\":\"session_end\"}') -Encoding UTF8; $lc = (Get-Content .copilot/session-activity.jsonl -ErrorAction SilentlyContinue | Measure-Object -Line).Lines; if ($lc -ge 10) { Set-Content -Path .copilot/pending-skill-review -Value 'review' -Encoding UTF8 }"
-            },
-            "timeoutSec": 5
-          },
-          {
-            "type": "command",
-            "command": {
-              "bash": "(python3 -c \"\nimport json,os,sys\nfrom datetime import datetime,timezone\nlog='.copilot/session-activity.jsonl'\nusage='.copilot/skill-usage.json'\nif not os.path.exists(log): sys.exit(0)\nskills={}\nfor line in open(log):\n    try:\n        e=json.loads(line)\n        s=e.get('skill','')\n        if s: skills[s]=skills.get(s,0)+1\n    except: pass\nif not skills: sys.exit(0)\ndata={'skills':{}}\nif os.path.exists(usage):\n    try: data=json.load(open(usage))\n    except: pass\nnow=datetime.now(timezone.utc).isoformat()\nfor name,count in skills.items():\n    if name not in data['skills']:\n        data['skills'][name]={'created':now,'lastUsed':now,'useCount':count,'lastEvaluated':None,'status':'active'}\n    else:\n        data['skills'][name]['lastUsed']=now\n        data['skills'][name]['useCount']=data['skills'][name].get('useCount',0)+count\njson.dump(data,open(usage,'w'),indent=2)\n\" || python -c \"\nimport json,os,sys\nfrom datetime import datetime,timezone\nlog='.copilot/session-activity.jsonl'\nusage='.copilot/skill-usage.json'\nif not os.path.exists(log): sys.exit(0)\nskills={}\nfor line in open(log):\n    try:\n        e=json.loads(line)\n        s=e.get('skill','')\n        if s: skills[s]=skills.get(s,0)+1\n    except: pass\nif not skills: sys.exit(0)\ndata={'skills':{}}\nif os.path.exists(usage):\n    try: data=json.load(open(usage))\n    except: pass\nnow=datetime.now(timezone.utc).isoformat()\nfor name,count in skills.items():\n    if name not in data['skills']:\n        data['skills'][name]={'created':now,'lastUsed':now,'useCount':count,'lastEvaluated':None,'status':'active'}\n    else:\n        data['skills'][name]['lastUsed']=now\n        data['skills'][name]['useCount']=data['skills'][name].get('useCount',0)+count\njson.dump(data,open(usage,'w'),indent=2)\n\") 2>/dev/null || true",
-              "powershell": "try { $log = '.copilot/session-activity.jsonl'; $usageFile = '.copilot/skill-usage.json'; if (-not (Test-Path $log)) { return }; $skills = @{}; Get-Content $log | ForEach-Object { try { $e = $_ | ConvertFrom-Json; if ($e.skill) { $c = if ($skills.ContainsKey($e.skill)) { $skills[$e.skill] } else { 0 }; $skills[$e.skill] = $c + 1 } } catch {} }; if ($skills.Count -eq 0) { return }; $data = if (Test-Path $usageFile) { Get-Content $usageFile -Raw | ConvertFrom-Json } else { [pscustomobject]@{ skills = [pscustomobject]@{} } }; $now = (Get-Date).ToUniversalTime().ToString('o'); foreach ($name in $skills.Keys) { if (-not $data.skills.PSObject.Properties[$name]) { $data.skills | Add-Member -NotePropertyName $name -NotePropertyValue ([pscustomobject]@{ created=$now; lastUsed=$now; useCount=$skills[$name]; lastEvaluated=$null; status='active' }) } else { $data.skills.$name.lastUsed = $now; $data.skills.$name.useCount = [int]$data.skills.$name.useCount + $skills[$name] } }; $data | ConvertTo-Json -Depth 4 | Set-Content $usageFile -Encoding UTF8 } catch {}"
-            },
-            "timeoutSec": 5
-          }
-        ]
+        "type": "command",
+        "bash": "mkdir -p .copilot && echo '{\"ts\":\"'$(date -u '+%Y-%m-%dT%H:%M:%SZ')'\",\"event\":\"session_end\"}' >> .copilot/session-activity.jsonl && LC=$(wc -l < .copilot/session-activity.jsonl 2>/dev/null || echo 0) && [ \"$LC\" -ge 10 ] && echo 'review' > .copilot/pending-skill-review || true",
+        "powershell": "if (-not (Test-Path .copilot)) { New-Item -ItemType Directory -Path .copilot -Force | Out-Null }; Add-Content -Path .copilot/session-activity.jsonl -Value ('{\"ts\":\"' + (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ') + '\",\"event\":\"session_end\"}') -Encoding UTF8; $lc = (Get-Content .copilot/session-activity.jsonl -ErrorAction SilentlyContinue | Measure-Object -Line).Lines; if ($lc -ge 10) { Set-Content -Path .copilot/pending-skill-review -Value 'review' -Encoding UTF8 }",
+        "timeoutSec": 5
+      },
+      {
+        "type": "command",
+        "bash": "(python3 -c \"\nimport json,os,sys\nfrom datetime import datetime,timezone\nlog='.copilot/session-activity.jsonl'\nusage='.copilot/skill-usage.json'\nif not os.path.exists(log): sys.exit(0)\nskills={}\nfor line in open(log):\n    try:\n        e=json.loads(line)\n        s=e.get('skill','')\n        if s: skills[s]=skills.get(s,0)+1\n    except: pass\nif not skills: sys.exit(0)\ndata={'skills':{}}\nif os.path.exists(usage):\n    try: data=json.load(open(usage))\n    except: pass\nnow=datetime.now(timezone.utc).isoformat()\nfor name,count in skills.items():\n    if name not in data['skills']:\n        data['skills'][name]={'created':now,'lastUsed':now,'useCount':count,'lastEvaluated':None,'status':'active'}\n    else:\n        data['skills'][name]['lastUsed']=now\n        data['skills'][name]['useCount']=data['skills'][name].get('useCount',0)+count\njson.dump(data,open(usage,'w'),indent=2)\n\" || python -c \"\nimport json,os,sys\nfrom datetime import datetime,timezone\nlog='.copilot/session-activity.jsonl'\nusage='.copilot/skill-usage.json'\nif not os.path.exists(log): sys.exit(0)\nskills={}\nfor line in open(log):\n    try:\n        e=json.loads(line)\n        s=e.get('skill','')\n        if s: skills[s]=skills.get(s,0)+1\n    except: pass\nif not skills: sys.exit(0)\ndata={'skills':{}}\nif os.path.exists(usage):\n    try: data=json.load(open(usage))\n    except: pass\nnow=datetime.now(timezone.utc).isoformat()\nfor name,count in skills.items():\n    if name not in data['skills']:\n        data['skills'][name]={'created':now,'lastUsed':now,'useCount':count,'lastEvaluated':None,'status':'active'}\n    else:\n        data['skills'][name]['lastUsed']=now\n        data['skills'][name]['useCount']=data['skills'][name].get('useCount',0)+count\njson.dump(data,open(usage,'w'),indent=2)\n\") 2>/dev/null || true",
+        "powershell": "try { $log = '.copilot/session-activity.jsonl'; $usageFile = '.copilot/skill-usage.json'; if (-not (Test-Path $log)) { return }; $skills = @{}; Get-Content $log | ForEach-Object { try { $e = $_ | ConvertFrom-Json; if ($e.skill) { $c = if ($skills.ContainsKey($e.skill)) { $skills[$e.skill] } else { 0 }; $skills[$e.skill] = $c + 1 } } catch {} }; if ($skills.Count -eq 0) { return }; $data = if (Test-Path $usageFile) { Get-Content $usageFile -Raw | ConvertFrom-Json } else { [pscustomobject]@{ skills = [pscustomobject]@{} } }; $now = (Get-Date).ToUniversalTime().ToString('o'); foreach ($name in $skills.Keys) { if (-not $data.skills.PSObject.Properties[$name]) { $data.skills | Add-Member -NotePropertyName $name -NotePropertyValue ([pscustomobject]@{ created=$now; lastUsed=$now; useCount=$skills[$name]; lastEvaluated=$null; status='active' }) } else { $data.skills.$name.lastUsed = $now; $data.skills.$name.useCount = [int]$data.skills.$name.useCount + $skills[$name] } }; $data | ConvertTo-Json -Depth 4 | Set-Content $usageFile -Encoding UTF8 } catch {}",
+        "timeoutSec": 5
       }
     ]
   }
