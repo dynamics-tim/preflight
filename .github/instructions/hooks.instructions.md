@@ -1,5 +1,5 @@
 ---
-applyTo: "references/hooks/**/*.json, .github/hooks/**/*.json"
+applyTo: ".github/hooks/**/*.json"
 ---
 
 <!-- managed-by: preflight -->

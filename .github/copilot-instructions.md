@@ -14,13 +14,6 @@ skills/
   preflight-scan/               — Optional fast-scan helper (scan.sh + scan.ps1)
   preflight-deep-scan/          — On-demand code pattern analysis skill
   skill-extractor/              — Session pattern heuristics, evaluation heuristics + rich logging scripts
-references/                     — Working example files the LLM reads and adapts
-  copilot-instructions/         — Per-stack instruction examples
-  path-instructions/            — Path-specific instruction examples
-  agents/                       — Custom agent profile examples
-  hooks/                        — Hook config examples (session-logger, guardrails)
-  skills/                       — Example auto-extracted skills
-  mcp/                          — MCP server config examples
 copilot-architecture-class/     — Educational materials on Copilot extensibility
 plugin.json                     — Plugin manifest for `copilot plugin install`
 ```
@@ -35,7 +28,6 @@ plugin.json                     — Plugin manifest for `copilot plugin install`
 
 - **File naming:** `kebab-case` everywhere (`code-reviewer.agent.md`, `scan.sh`)
 - **Agent/skill files:** Always include YAML frontmatter (`name`, `description`, `tools`)
-- **Reference examples:** Complete, working examples — NOT templates with placeholders. The LLM reads and adapts them intelligently.
 - **Managed markers:** Generated files use `<!-- managed-by: preflight -->` and `<!-- end-managed-by: preflight -->` for idempotent updates
 - **Dual-platform scripts:** Every shell script ships as a `.sh` + `.ps1` pair with identical JSON output
 
@@ -58,7 +50,6 @@ plugin.json                     — Plugin manifest for `copilot plugin install`
 
 - Do not put workflow steps in skills — skills are relevance-triggered, not reliably callable as subroutines
 - Never overwrite user-created files without confirmation; always check for managed markers first
-- Reference examples should be complete and opinionated; vague examples produce vague output
 - The 30K character limit on agent prompts is generous but finite — keep prompts focused
 - Skills should NOT list `ask_user` in `allowed-tools` — user interaction happens through the agent
 - Keep skill trigger descriptions narrow to avoid false-positive context injection

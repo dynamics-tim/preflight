@@ -378,7 +378,7 @@ Use `ask_user` with a boolean:
 }
 ```
 
-Generate content following the structure in "Instruction Generation Rules" below. Include `<!-- managed-by: preflight -->` markers. Adapt to the actual detected stack — use real project names, commands, and conventions. Refer to reference examples in `references/copilot-instructions/` for tone and depth.
+Generate content following the structure in "Instruction Generation Rules" below. Include `<!-- managed-by: preflight -->` markers. Adapt to the actual detected stack — use real project names, commands, and conventions.
 
 #### Category 2: Path-specific instructions
 
@@ -507,7 +507,46 @@ Use `ask_user` with a boolean:
 
 Default to **false** — this is opt-in for power users.
 
-If the user accepts, create `.github/hooks/session-logger.json` using the reference example from `references/hooks/session-logger.json`. Read it and adapt if needed (the reference includes sessionStart rotation, postToolUse logging with file path extraction, sessionEnd with pending-review marker, and skill-usage aggregation).
+If the user accepts, create `.github/hooks/session-logger.json` using the template below. Adapt if needed based on the project's detected stack.
+
+```json
+{
+  "version": 1,
+  "_comment": "Session activity logger for skill extraction. Add .copilot/ to your .gitignore — logs are ephemeral. Hooks receive context as JSON via stdin.",
+  "hooks": {
+    "sessionStart": [
+      {
+        "type": "command",
+        "bash": "mkdir -p .copilot && [ -f .copilot/session-activity.jsonl ] && mv .copilot/session-activity.jsonl .copilot/session-activity.prev.jsonl 2>/dev/null; echo '{\"ts\":\"'$(date -u '+%Y-%m-%dT%H:%M:%SZ')'\",\"event\":\"session_start\",\"cwd\":\"'$(basename \"$PWD\")'\"}' >> .copilot/session-activity.jsonl && [ -f .copilot/pending-skill-review ] && echo '[skill-extractor] Previous session has unreviewed patterns — say \"review last session\" to extract skills, or \"evaluate skills\" to improve existing ones.' >&2 || true",
+        "powershell": "if (-not (Test-Path .copilot)) { New-Item -ItemType Directory -Path .copilot -Force | Out-Null }; if (Test-Path .copilot/session-activity.jsonl) { Move-Item .copilot/session-activity.jsonl .copilot/session-activity.prev.jsonl -Force }; $ts = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ'); Add-Content -Path .copilot/session-activity.jsonl -Value ('{\"ts\":\"' + $ts + '\",\"event\":\"session_start\",\"cwd\":\"' + (Split-Path -Leaf (Get-Location)) + '\"}') -Encoding UTF8; if (Test-Path .copilot/pending-skill-review) { Write-Host '[skill-extractor] Previous session has unreviewed patterns - say \"review last session\" to extract skills, or \"evaluate skills\" to improve existing ones.' }",
+        "timeoutSec": 5
+      }
+    ],
+    "postToolUse": [
+      {
+        "type": "command",
+        "bash": "INPUT=$(cat); TOOL=$(echo \"$INPUT\" | jq -r '.toolName // \"unknown\"'); ARGS=$(echo \"$INPUT\" | jq -r '.toolArgs // \"\"'); if echo \"$ARGS\" | jq empty 2>/dev/null; then P=$(echo \"$ARGS\" | jq -r '.path // empty' 2>/dev/null); C=$(echo \"$ARGS\" | jq -r '.command // empty' 2>/dev/null); D=$(echo \"$ARGS\" | jq -r '.description // empty' 2>/dev/null); I=$(echo \"$ARGS\" | jq -r '.intent // empty' 2>/dev/null); PA=$(echo \"$ARGS\" | jq -r '.pattern // empty' 2>/dev/null); else P=$(echo \"$INPUT\" | jq -r '.toolArgs.path // empty' 2>/dev/null); C=$(echo \"$INPUT\" | jq -r '.toolArgs.command // empty' 2>/dev/null); D=$(echo \"$INPUT\" | jq -r '.toolArgs.description // empty' 2>/dev/null); I=$(echo \"$INPUT\" | jq -r '.toolArgs.intent // empty' 2>/dev/null); PA=$(echo \"$INPUT\" | jq -r '.toolArgs.pattern // empty' 2>/dev/null); fi; [ -n \"$P\" ] && GR=$(git rev-parse --show-toplevel 2>/dev/null) && [ -n \"$GR\" ] && P=\"${P#$GR/}\"; EX=''; [ -n \"$P\" ] && EX=\"$EX,\\\"path\\\":\\\"$P\\\"\"; [ -n \"$D\" ] && EX=\"$EX,\\\"desc\\\":\\\"$D\\\"\"; [ -n \"$I\" ] && EX=\"$EX,\\\"intent\\\":\\\"$I\\\"\"; [ -n \"$PA\" ] && EX=\"$EX,\\\"pattern\\\":\\\"$PA\\\"\"; [ -n \"$C\" ] && C=$(printf '%s' \"$C\" | head -c 120 | tr '\\n' ' ') && EX=\"$EX,\\\"cmd\\\":\\\"$(printf '%s' \"$C\" | sed 's/\\\\/\\\\\\\\/g;s/\"/\\\\\"/g')\\\"\"; mkdir -p .copilot && echo '{\"ts\":\"'$(date -u '+%Y-%m-%dT%H:%M:%SZ')'\",\"tool\":\"'\"$TOOL\"'\"'\"$EX\"'}' >> .copilot/session-activity.jsonl 2>/dev/null || true",
+        "powershell": "try { $in = [Console]::In.ReadToEnd() | ConvertFrom-Json; $tool = if ($in.toolName) { $in.toolName } else { 'unknown' }; $ex = ''; try { $a = if ($in.toolArgs -is [string]) { $in.toolArgs | ConvertFrom-Json } else { $in.toolArgs }; if ($a.path) { $pVal = $a.path -replace '\\\\','/'; $gr = (git rev-parse --show-toplevel 2>$null); if ($gr) { $gr = $gr.Trim() -replace '\\\\','/'; if ($pVal.StartsWith($gr + '/',[System.StringComparison]::OrdinalIgnoreCase)) { $pVal = $pVal.Substring($gr.Length + 1) } }; $ex += ',\"path\":\"' + $pVal + '\"' }; if ($a.description) { $ex += ',\"desc\":\"' + ($a.description -replace '\"','') + '\"' }; if ($a.intent) { $ex += ',\"intent\":\"' + ($a.intent -replace '\"','') + '\"' }; if ($a.pattern) { $ex += ',\"pattern\":\"' + ($a.pattern -replace '\"','') + '\"' }; if ($a.command) { $c = $a.command -replace \"`n\",' '; if ($c.Length -gt 120) { $c = $c.Substring(0,120) }; $ex += ',\"cmd\":\"' + ($c -replace '\\\\','\\\\' -replace '\"','\\\"') + '\"' } } catch {}; if (-not (Test-Path .copilot)) { New-Item -ItemType Directory -Path .copilot -Force | Out-Null }; Add-Content -Path .copilot/session-activity.jsonl -Value ('{\"ts\":\"' + (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ') + '\",\"tool\":\"' + $tool + '\"' + $ex + '}') -Encoding UTF8 } catch {}",
+        "timeoutSec": 5
+      }
+    ],
+    "sessionEnd": [
+      {
+        "type": "command",
+        "bash": "mkdir -p .copilot && echo '{\"ts\":\"'$(date -u '+%Y-%m-%dT%H:%M:%SZ')'\",\"event\":\"session_end\"}' >> .copilot/session-activity.jsonl && LC=$(wc -l < .copilot/session-activity.jsonl 2>/dev/null || echo 0) && [ \"$LC\" -ge 10 ] && echo 'review' > .copilot/pending-skill-review || true",
+        "powershell": "if (-not (Test-Path .copilot)) { New-Item -ItemType Directory -Path .copilot -Force | Out-Null }; Add-Content -Path .copilot/session-activity.jsonl -Value ('{\"ts\":\"' + (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ') + '\",\"event\":\"session_end\"}') -Encoding UTF8; $lc = (Get-Content .copilot/session-activity.jsonl -ErrorAction SilentlyContinue | Measure-Object -Line).Lines; if ($lc -ge 10) { Set-Content -Path .copilot/pending-skill-review -Value 'review' -Encoding UTF8 }",
+        "timeoutSec": 5
+      },
+      {
+        "type": "command",
+        "bash": "(python3 -c \"\nimport json,os,sys\nfrom datetime import datetime,timezone\nlog='.copilot/session-activity.jsonl'\nusage='.copilot/skill-usage.json'\nif not os.path.exists(log): sys.exit(0)\nskills={}\nfor line in open(log):\n    try:\n        e=json.loads(line)\n        s=e.get('skill','')\n        if s: skills[s]=skills.get(s,0)+1\n    except: pass\nif not skills: sys.exit(0)\ndata={'skills':{}}\nif os.path.exists(usage):\n    try: data=json.load(open(usage))\n    except: pass\nnow=datetime.now(timezone.utc).isoformat()\nfor name,count in skills.items():\n    if name not in data['skills']:\n        data['skills'][name]={'created':now,'lastUsed':now,'useCount':count,'lastEvaluated':None,'status':'active'}\n    else:\n        data['skills'][name]['lastUsed']=now\n        data['skills'][name]['useCount']=data['skills'][name].get('useCount',0)+count\njson.dump(data,open(usage,'w'),indent=2)\n\" || python -c \"\nimport json,os,sys\nfrom datetime import datetime,timezone\nlog='.copilot/session-activity.jsonl'\nusage='.copilot/skill-usage.json'\nif not os.path.exists(log): sys.exit(0)\nskills={}\nfor line in open(log):\n    try:\n        e=json.loads(line)\n        s=e.get('skill','')\n        if s: skills[s]=skills.get(s,0)+1\n    except: pass\nif not skills: sys.exit(0)\ndata={'skills':{}}\nif os.path.exists(usage):\n    try: data=json.load(open(usage))\n    except: pass\nnow=datetime.now(timezone.utc).isoformat()\nfor name,count in skills.items():\n    if name not in data['skills']:\n        data['skills'][name]={'created':now,'lastUsed':now,'useCount':count,'lastEvaluated':None,'status':'active'}\n    else:\n        data['skills'][name]['lastUsed']=now\n        data['skills'][name]['useCount']=data['skills'][name].get('useCount',0)+count\njson.dump(data,open(usage,'w'),indent=2)\n\") 2>/dev/null || true",
+        "powershell": "try { $log = '.copilot/session-activity.jsonl'; $usageFile = '.copilot/skill-usage.json'; if (-not (Test-Path $log)) { return }; $skills = @{}; Get-Content $log | ForEach-Object { try { $e = $_ | ConvertFrom-Json; if ($e.skill) { $c = if ($skills.ContainsKey($e.skill)) { $skills[$e.skill] } else { 0 }; $skills[$e.skill] = $c + 1 } } catch {} }; if ($skills.Count -eq 0) { return }; $data = if (Test-Path $usageFile) { Get-Content $usageFile -Raw | ConvertFrom-Json } else { [pscustomobject]@{ skills = [pscustomobject]@{} } }; $now = (Get-Date).ToUniversalTime().ToString('o'); foreach ($name in $skills.Keys) { if (-not $data.skills.PSObject.Properties[$name]) { $data.skills | Add-Member -NotePropertyName $name -NotePropertyValue ([pscustomobject]@{ created=$now; lastUsed=$now; useCount=$skills[$name]; lastEvaluated=$null; status='active' }) } else { $data.skills.$name.lastUsed = $now; $data.skills.$name.useCount = [int]$data.skills.$name.useCount + $skills[$name] } }; $data | ConvertTo-Json -Depth 4 | Set-Content $usageFile -Encoding UTF8 } catch {}",
+        "timeoutSec": 5
+      }
+    ]
+  }
+}
+```
 
 Also append `.copilot/` to the project's `.gitignore` (create it if it doesn't exist).
 
@@ -550,7 +589,24 @@ Use `ask_user` with a structured form:
 
 Default to **true** — this is a low-risk, high-value feature.
 
-If the user accepts, create `.github/hooks/config-freshness.json` using the reference example from `references/hooks/config-freshness.json`. If the user specified a custom `thresholdDays`, embed it in the state file.
+If the user accepts, create `.github/hooks/config-freshness.json` using the template below. If the user specified a custom `thresholdDays`, embed it in the state file.
+
+```json
+{
+  "version": 1,
+  "_comment": "Config freshness checker. Runs at session start to remind the user to re-run @preflight if the config is stale (default: 30 days). Reads .github/.preflight-state.json for lastRun timestamp and optional reminderDaysThreshold.",
+  "hooks": {
+    "sessionStart": [
+      {
+        "type": "command",
+        "bash": "if [ -f .github/.preflight-state.json ]; then python3 -c \"import json,sys,datetime;s=json.load(open('.github/.preflight-state.json'));lr=datetime.datetime.fromisoformat(s['lastRun'].replace('Z','+00:00'));th=int(s.get('reminderDaysThreshold',30));d=(datetime.datetime.now(datetime.timezone.utc)-lr).days;print(f'[preflight] Config is {d} days old — run @preflight to update.',file=sys.stderr) if d>=th else None\" 2>&1 >&2 || true; else echo '[preflight] No Copilot config found — run @preflight to set up this project.' >&2; fi || true",
+        "powershell": "try { if (Test-Path .github/.preflight-state.json) { $s = Get-Content .github/.preflight-state.json -Raw | ConvertFrom-Json; $lastRun = [datetime]::Parse($s.lastRun).ToUniversalTime(); $threshold = if ($s.reminderDaysThreshold) { [int]$s.reminderDaysThreshold } else { 30 }; $days = ((Get-Date).ToUniversalTime() - $lastRun).Days; if ($days -ge $threshold) { Write-Host \"[preflight] Config is $days days old — run @preflight to update.\" } } else { Write-Host '[preflight] No Copilot config found — run @preflight to set up this project.' } } catch {}",
+        "timeoutSec": 5
+      }
+    ]
+  }
+}
+```
 
 Add the hook file to the `managedFiles` array in `.preflight-state.json`. Also store `"reminderDaysThreshold"` in the state file (the value from the user's selection, or 30 if they accepted the default).
 
@@ -739,11 +795,11 @@ Always wrap in managed markers:
 
 ### Path-specific instructions (`.github/instructions/*.instructions.md`)
 
-Structure: YAML frontmatter with `applyTo` glob → conventions → patterns to follow → anti-patterns. Target: 15–30 lines. Always include `<!-- managed-by: preflight -->` markers. Refer to reference examples in `references/path-instructions/` for format and tone.
+Structure: YAML frontmatter with `applyTo` glob → conventions → patterns to follow → anti-patterns. Target: 15–30 lines. Always include `<!-- managed-by: preflight -->` markers.
 
 ### Custom agents (`.github/agents/*.agent.md`)
 
-Structure: YAML frontmatter (`name`, `description`, `tools`) → identity paragraph → workflow steps → behavioral rules. One agent = one job. Refer to reference examples in `references/agents/` for format and tone.
+Structure: YAML frontmatter (`name`, `description`, `tools`) → identity paragraph → workflow steps → behavioral rules. One agent = one job.
 
 ---
 

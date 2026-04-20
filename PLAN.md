@@ -50,7 +50,7 @@ Phase 3: Recommend & Confirm
   - User confirms/rejects EACH item individually
          ↓
 Phase 4: Scaffold
-  - Agent reads reference examples, adapts to project specifics
+  - Agent adapts output to project specifics
   - Creates confirmed files using native edit/create tools
   - Applies per-artifact merge strategy (see Idempotency below)
   - Presents summary of what was created/modified
@@ -64,7 +64,7 @@ From the official docs: Skills are "on-demand, relevance-triggered context injec
 
 ## Repo Structure
 
-Clear separation between **plugin runtime assets** (what makes the tool work) and **reference examples** (what gets adapted and written into the target repo).
+The plugin runtime assets (what makes the tool work) are organized as follows:
 
 ```
 preflight/
@@ -81,27 +81,6 @@ preflight/
 │       ├── scan.sh                        # Optional: fast deterministic fact extraction
 │       └── scan.ps1                       # Windows equivalent
 │
-├── references/                            # Example files the agent reads and adapts
-│   ├── copilot-instructions/              # Example instruction files per stack
-│   │   ├── typescript.md                  # Example for TS projects
-│   │   ├── python.md                      # Example for Python projects
-│   │   ├── rust.md                        # Example for Rust projects
-│   │   └── general.md                     # Stack-agnostic baseline
-│   ├── path-instructions/                 # Example path-specific instructions
-│   │   ├── react-components.md            # Example: applyTo "**/*.tsx"
-│   │   ├── api-routes.md                  # Example: applyTo "src/api/**/*.ts"
-│   │   ├── tests.md                       # Example: applyTo "**/*.test.*"
-│   │   └── styles.md                      # Example: applyTo "**/*.css"
-│   ├── agents/                            # Example custom agent profiles
-│   │   ├── code-reviewer.agent.md         # Review-focused agent
-│   │   ├── test-specialist.agent.md       # Testing-focused agent
-│   │   └── docs-writer.agent.md           # Documentation agent
-│   ├── hooks/                             # Example hook configurations
-│   │   ├── guardrails.json                # Block edits to protected paths
-│   │   └── logging.json                   # Session activity logging
-│   └── mcp/                               # Example MCP server configs
-│       └── common-servers.json            # GitHub, DB, cloud patterns
-│
 └── plugin.json                            # Added in v2 for /plugin install
 ```
 
@@ -109,7 +88,6 @@ preflight/
 
 - **`agents/preflight.agent.md`** — Contains the FULL workflow as agent instructions (30,000 char limit is plenty)
 - **`skills/preflight-scan/`** — Optional helper, NOT a workflow step. Contains scan heuristics as reference knowledge + helper scripts for fast fact extraction
-- **`references/`** — Example files the agent reads and adapts to the target project. These are NOT templates with variable placeholders — they are complete, working examples that the LLM adapts intelligently
 - **`plugin.json`** — Added later in v2. Not needed for v1 (agent can be copied or linked directly)
 
 ## Idempotency Strategy
@@ -155,13 +133,7 @@ This enables safe re-runs: the agent knows what it created vs. what the user cre
    - Interactive confirmation for each recommended artifact
    - Idempotency logic with managed-file markers
    - State tracking via `.preflight-state.json`
-3. **`reference-examples`** — Create reference example files:
-   - 4x stack-specific instruction examples (TS, Python, Rust, general)
-   - 4x path-specific instruction examples
-   - 3x custom agent examples
-   - 2x hook examples
-   - 1x MCP config example
-4. **`scan-helpers`** — Build optional scan helper scripts:
+3. **`scan-helpers`** — Build optional scan helper scripts:
    - `scan.sh` + `scan.ps1` for fast deterministic fact extraction
    - Outputs JSON: detected manifests, package managers, languages, folder structure
    - Used as optional speedup, NOT required for the workflow
@@ -184,12 +156,11 @@ This enables safe re-runs: the agent knows what it created vs. what the user cre
 
 ```
 repo-setup ──┬── init-agent ────┬── testing ──── docs
-             ├── reference-examples ─┘              │
-             └── scan-helpers ───────┘              │
-                                          plugin-package ── marketplace
+             └── scan-helpers ──┘              │
+                                      plugin-package ── marketplace
 ```
 
-Phase 1 items (repo-setup, init-agent, reference-examples, scan-helpers) can be parallelized after repo-setup. Phase 2 depends on Phase 1. Phase 3 depends on Phase 2.
+Phase 1 items (repo-setup, init-agent, scan-helpers) can be parallelized after repo-setup. Phase 2 depends on Phase 1. Phase 3 depends on Phase 2.
 
 ## MVP Scope (v1)
 
@@ -215,7 +186,7 @@ What v1 **defers**:
 1. **Agent-first, plugin-later** — Following official best practice; avoids coupling to evolving plugin API
 2. **Agent owns the workflow** — Skills are helper context, not orchestration steps
 3. **Native tools over scripts** — The LLM + glob/read/search is the primary scanner; scripts are optional helpers
-4. **Reference examples over templates** — No `.tmpl` rendering engine; the LLM reads examples and adapts intelligently
+4. **Native tools over scripts** — The LLM + glob/read/search is the primary scanner; scripts are optional helpers
 5. **Interactive, not opinionated** — Recommends but always asks; never force-generates
 6. **Explicit idempotency** — Per-artifact merge strategy with managed-file markers and state tracking
 7. **Self-contained** — No dependency on Squad or other plugins

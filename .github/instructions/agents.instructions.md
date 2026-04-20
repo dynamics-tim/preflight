@@ -1,5 +1,5 @@
 ---
-applyTo: "agents/**/*.md, references/agents/**/*.md"
+applyTo: "agents/**/*.md"
 ---
 
 <!-- managed-by: preflight -->

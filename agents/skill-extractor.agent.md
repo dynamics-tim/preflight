@@ -205,7 +205,15 @@ allowed-tools:
 
 ## Rules
 - <Any conventions or constraints observed>
+
+## Revision History
+
+| Version | Date | Change | Reason |
+|---------|------|--------|--------|
+| v1 | <date> | Initial extraction from <N> repeated sessions | Detected pattern: <brief description of the repeating sequence> |
 ```
+
+The Revision History table is mandatory for all generated skills. It provides an audit trail for the evaluate & improve workflow. Each evaluation or improvement cycle adds a new row documenting what changed and why (e.g., usage drift detected, false-positive triggers narrowed, workflow steps added based on observed user behavior).
 
 ## Constraints
 

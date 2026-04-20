@@ -29,8 +29,7 @@ Each line in `.copilot/session-activity.jsonl` is a JSON object.
 **Boundaries**: `{"ts":"...","event":"session_start","cwd":"project-name"}` / `{"event":"session_end"}`
 
 If the log is missing, the session-logger hook needs to be installed.
-Run `@preflight` to scaffold it, or copy `references/hooks/session-logger.json`
-to `.github/hooks/`.
+Run `@preflight` to scaffold it.
 
 ## Fields Reference
 
@@ -94,7 +93,7 @@ Find recurring `execute` commands with different arguments. Parameterize:
 
 ## Quality Standards
 
-- Generated skills must follow project skill conventions (see `references/skills/` for examples)
+- Generated skills must follow project skill conventions
 - Helper scripts ship as `.sh` + `.ps1` pairs with identical behavior
 - Skill descriptions must be precise enough for Copilot to auto-match correctly
 - Generalized globs must not be too broad (`**/*` is useless)

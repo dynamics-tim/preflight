@@ -3,7 +3,7 @@ name: preflight-authoring
 description: |
   Authoring skill scripts, hook configs, and instruction files for the preflight
   plugin project itself. Use ONLY when creating or updating files under `skills/`,
-  `.github/hooks/`, `references/hooks/`, or `.github/instructions/` within the
+  `.github/hooks/`, or `.github/instructions/` within the
   preflight repository. Not for other projects that consume preflight output.
   Triggers: "create skill script", "add helper script pair", "script parity",
   "create hook", "add hook config", "configure hook event", "guardrails hook",
@@ -93,11 +93,10 @@ commands that meet performance constraints.
    - **Freshness** — Check config age or drift on `sessionStart`
    - **Custom** — Other automation on any supported event
 
-2. **Choose a reference hook** — Read the closest match from `references/hooks/`:
-   - `session-logger.json` — For logging hooks (postToolUse, sessionStart/End)
-   - `guardrails.json` — For preToolUse deny rules (reads stdin, outputs permissionDecision JSON)
-   - `logging.json` — For simple session logging
-   - `config-freshness.json` — For sessionStart checks
+2. **Choose a hook pattern** — Determine which category best fits:
+   - `session-logger` style — For logging hooks (postToolUse, sessionStart/End)
+   - `guardrails` style — For preToolUse deny rules (reads stdin, outputs permissionDecision JSON)
+   - `config-freshness` style — For sessionStart checks
 
 3. **Select events** — Use only the events you need:
 
@@ -126,7 +125,6 @@ commands that meet performance constraints.
 ### Hook File Patterns
 
 - `.github/hooks/*.json` — Active hook configurations
-- `references/hooks/*.json` — Reference hook examples
 
 ### Hook Rules
 
