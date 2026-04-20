@@ -21,13 +21,50 @@ Provides pattern detection heuristics and log format knowledge for analyzing
 
 Each line in `.copilot/session-activity.jsonl` is a JSON object.
 
-**Minimal** (inline hook): `{"ts":"...","tool":"editFile"}`
-**Rich** (helper scripts): `{"ts":"...","tool":"editFile","path":"src/utils.ts","args_summary":"..."}`
+**Minimal**: `{"ts":"...","tool":"view"}`
+**With context**: `{"ts":"...","tool":"edit","path":"src/utils.ts","desc":"Update auth logic"}`
+**With command**: `{"ts":"...","tool":"powershell","desc":"Run tests","cmd":"npm test"}`
+**With intent**: `{"ts":"...","tool":"report_intent","intent":"Implementing auth module"}`
+**With pattern**: `{"ts":"...","tool":"grep","pattern":"handleAuth","path":"src/"}`
 **Boundaries**: `{"ts":"...","event":"session_start","cwd":"project-name"}` / `{"event":"session_end"}`
 
 If the log is missing, the session-logger hook needs to be installed.
 Run `@preflight` to scaffold it, or copy `references/hooks/session-logger.json`
 to `.github/hooks/`.
+
+## Fields Reference
+
+| Field | Present When | Description |
+|---|---|---|
+| `ts` | Always | ISO 8601 UTC timestamp |
+| `tool` | Tool call entries | Tool name: `view`, `edit`, `create`, `grep`, `glob`, `powershell`, `sql`, `ask_user`, `task`, `read_agent`, `report_intent`, etc. |
+| `event` | Boundary entries | `session_start` or `session_end` |
+| `cwd` | `session_start` | Working directory basename |
+| `path` | File operations | Repo-relative file path (e.g., `src/utils.ts`) |
+| `desc` | Tools with description arg | Human-readable description of the operation |
+| `cmd` | `powershell` | First 120 chars of the shell command |
+| `intent` | `report_intent` | Phase label (e.g., "Exploring codebase", "Implementing auth") |
+| `pattern` | `grep`, `glob` | The search pattern or glob used |
+
+## Phase Boundaries
+
+`report_intent` entries with an `intent` field mark phase transitions within a session.
+Use these to split sessions into named phases for more meaningful pattern detection.
+
+Example session phases:
+```
+{"tool":"report_intent","intent":"Exploring codebase"}    ← Phase 1
+{"tool":"view","path":"src/auth.ts"}
+{"tool":"grep","pattern":"handleLogin"}
+{"tool":"report_intent","intent":"Implementing auth fix"}  ← Phase 2
+{"tool":"edit","path":"src/auth.ts"}
+{"tool":"powershell","cmd":"npm test"}
+{"tool":"report_intent","intent":"Committing changes"}     ← Phase 3
+{"tool":"powershell","cmd":"git add -A && git commit..."}
+```
+
+Phase-level patterns (e.g., "explore → implement → test → commit") are higher-value
+skill candidates than raw tool-level sequences because they capture workflow intent.
 
 ## Pattern Detection Heuristics
 

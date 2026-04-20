@@ -1,6 +1,23 @@
 {
   "_comment": "Maps each plugin release to config improvements. Used by the preflight agent to surface targeted upgrade actions when a version bump is detected between the installed plugin and the version stored in .preflight-state.json.",
   "changelog": {
+    "1.2.1": {
+      "summary": "Improved skill extractor — session logger now captures intent and search patterns, extractor uses phase-based detection for higher-quality skill candidates.",
+      "configImpacts": [
+        {
+          "type": "improvement",
+          "description": "Session logger hook now captures `intent` from report_intent and `pattern` from grep/glob — enabling phase-based session analysis.",
+          "affectedFiles": [".github/hooks/session-logger.json"],
+          "recommendation": "Reinstall the session-logger hook to start capturing intent and pattern data. Existing logs still work but lack these fields."
+        },
+        {
+          "type": "improvement",
+          "description": "Skill extractor now splits sessions into named phases via report_intent entries and detects phase-level workflow patterns (Explore → Plan → Implement → Release).",
+          "affectedFiles": [],
+          "recommendation": "Run @skill-extractor after a few sessions to benefit from improved phase-aware pattern detection."
+        }
+      ]
+    },
     "1.2.0": {
       "summary": "Added plugin update detection — preflight now checks for newer releases and surfaces config improvements when the plugin has been updated since your last setup.",
       "configImpacts": [

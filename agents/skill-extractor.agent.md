@@ -32,21 +32,38 @@ If the data is insufficient, explain clearly what the user needs to do and how l
    - **If present but sparse** (fewer than 10 tool calls): Tell the user: "I found session data, but there aren't enough tool calls yet to detect reliable patterns. Keep working normally — I need at least 3 sessions with 10+ tool calls each. Come back after a few more sessions."
    - **If sufficient:** Proceed to step 2.
 
-2. **Parse the activity log.** Each line is a JSONL entry with `ts`, `tool`, `path`, and `args_summary` fields. Session boundaries are marked by `event: session_start` and `event: session_end` entries.
+2. **Parse the activity log.** Each line is a JSONL entry. Common fields: `ts`, `tool`, `path`, `desc`, `cmd`, `intent`, `pattern`. Session boundaries are marked by `event: session_start` and `event: session_end` entries.
 
-3. **Identify repeatable patterns.** Look for:
+3. **Detect session phases.** Split the parsed session into phases using `report_intent` entries. Each `report_intent` entry with an `intent` field marks the start of a new phase. Label each phase with its intent text (e.g., "Exploring codebase", "Implementing auth fix", "Committing changes"). If no `report_intent` entries exist, treat the entire session as a single phase.
+
+   Phases reveal workflow structure:
+   - **Explore phase** — dominated by `view`, `grep`, `glob` calls
+   - **Plan phase** — `ask_user`, `create`(plan), `sql`(todos) calls
+   - **Implement phase** — `edit`, `create`, `powershell`(test) calls
+   - **Release phase** — `powershell`(git add/commit/push) calls
+
+   Phase-level patterns (e.g., "every implementation task follows Explore → Plan → Implement → Release") are higher-value skill candidates than raw tool sequences because they capture workflow intent, not just tool mechanics.
+
+4. **Identify repeatable patterns.** Look for patterns at two levels:
+
+   **Phase-level patterns** (higher value):
+   - **Phase sequences** — The same phase types appearing in the same order across sessions (e.g., Explore → Implement → Test is a consistent workflow)
+   - **Phase templates** — A specific phase type always contains the same tool sequence (e.g., every "Release" phase is: `powershell`(git add) → `powershell`(git commit) → `powershell`(git push))
+
+   **Tool-level patterns** (within a single phase):
    - **Repeated sequences** — Same chain of 3+ tool calls appearing 2+ times (same tools in same order, similar path shapes)
    - **Paired file operations** — Editing `*.ts` always followed by editing `*.test.ts`
    - **Recurring commands** — Same shell command with different arguments (parameterize them)
    - **Scaffold patterns** — Creating the same set of files for different entities
 
-4. **Score and rank candidates.** Assign confidence based on:
+5. **Score and rank candidates.** Assign confidence based on:
    - Repetition count (2× = medium, 3+× = high)
    - Sequence length (longer = more valuable)
    - Consistency (same order every time = higher confidence)
+   - **Phase awareness** — Patterns that span a complete phase score 1.5× higher than phase-fragments. Phase-level patterns (sequences of phases) score 2× higher than tool-level patterns.
    - Skip very short patterns (2 steps) or single-file operations
 
-5. **Present candidates to the user.** For each candidate, show:
+6. **Present candidates to the user.** For each candidate, show:
    - A descriptive name (kebab-case)
    - What it does (one sentence)
    - The detected sequence of steps
@@ -54,13 +71,13 @@ If the data is insufficient, explain clearly what the user needs to do and how l
    - How many times it was repeated
    Use `ask_user` with a multi-select to let the user choose which to save.
 
-6. **Generate skill files.** For each confirmed pattern:
+7. **Generate skill files.** For each confirmed pattern:
    - Create `.github/skills/<name>/SKILL.md` with proper frontmatter
    - Extract shell commands into `run.sh` + `run.ps1` helper scripts if applicable
    - Generalize specific paths to glob patterns
    - Parameterize specific values in commands
 
-7. **Clean up.** Remove `.copilot/pending-skill-review` if it exists. Summarize what was created.
+8. **Clean up.** Remove `.copilot/pending-skill-review` if it exists. Summarize what was created.
 
 ## How to Evaluate & Improve
 

@@ -178,7 +178,7 @@ Use `glob` for:
 
 #### 1i. Check for plugin updates
 
-The current installed version of preflight is **CURRENT_PLUGIN_VERSION = "1.2.0"**.
+The current installed version of preflight is **CURRENT_PLUGIN_VERSION = "1.2.1"**.
 
 Silently perform two checks:
 
@@ -616,7 +616,7 @@ After all files are created, create or update `.github/.preflight-state.json`:
 ```json
 {
   "version": "1.0.0",
-  "pluginVersion": "1.2.0",
+  "pluginVersion": "1.2.1",
   "lastRun": "<ISO 8601 timestamp>",
   "detectedStack": {
     "languages": ["typescript"],
@@ -633,7 +633,7 @@ After all files are created, create or update `.github/.preflight-state.json`:
 }
 ```
 
-- `pluginVersion` — always set to `CURRENT_PLUGIN_VERSION` ("1.2.0"). This is what future runs compare against to detect version drift and surface config improvements from newer plugin releases.
+- `pluginVersion` — always set to `CURRENT_PLUGIN_VERSION` ("1.2.1"). This is what future runs compare against to detect version drift and surface config improvements from newer plugin releases.
 
 If `.preflight-state.json` already exists, update it (merge `managedFiles`, update `lastRun`, `detectedStack`, and `pluginVersion`).
 
