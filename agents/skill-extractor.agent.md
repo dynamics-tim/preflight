@@ -7,6 +7,7 @@ tools:
   - search
   - execute
   - ask_user
+  - sql
 ---
 
 # Skill Extractor Agent
@@ -17,24 +18,103 @@ The `skill-extractor` skill provides pattern detection heuristics and log format
 
 ## How to Work
 
+### Data Sources
+
+You have two data sources. **Always start with the session store** — it's available in every Copilot session with zero setup.
+
+| Source | Tool | Strengths | Limitations |
+|--------|------|-----------|-------------|
+| **Session Store** (primary) | `sql` with `database: "session_store"` | All sessions (50+), FTS5 search, file edit history, cross-repo context, zero setup | No tool-call-level sequences, no phase boundaries |
+| **JSONL Activity Log** (enrichment) | `read` on `.copilot/session-activity.jsonl` | Fine-grained tool call sequences (view→edit→test), phase boundaries via `report_intent`, command args | Only 1-2 sessions, requires hook installation |
+
+**Which source per workflow:**
+
+| Workflow | Use Session Store | Use JSONL |
+|----------|-------------------|-----------|
+| **Extract** | Cross-session repetition (file patterns, similar requests) | Tool sequences + phase boundaries (needed for fine-grained sequence/phase analysis; extraction can proceed from session store alone at reduced detail) |
+| **Evaluate** | Primary — user intent, file patterns, activity across all history | Optional — tool-level detail for drift detection |
+| **Clean up** | Sole source — staleness across all history | Not needed |
+
+#### Session Store Schema
+
+Query with `sql` tool, `database: "session_store"`. Available tables:
+
+- **`sessions`** — `id`, `cwd`, `repository`, `branch`, `summary`, `created_at`, `updated_at`
+- **`turns`** — `session_id`, `turn_index`, `user_message`, `assistant_response`, `timestamp`
+- **`checkpoints`** — `session_id`, `checkpoint_number`, `title`, `overview`, `work_done`, `technical_details`, `important_files`, `next_steps`
+- **`session_files`** — `session_id`, `file_path`, `tool_name` (edit/create), `turn_index`, `first_seen_at`
+- **`search_index`** — FTS5 virtual table: `content`, `session_id`, `source_type`, `source_id`. Use `WHERE search_index MATCH 'query'` with OR for synonym expansion.
+
+#### Key SQL Queries
+
+**Cross-session file patterns** (which files are edited together repeatedly):
+```sql
+SELECT sf.file_path, COUNT(DISTINCT sf.session_id) as session_count
+FROM session_files sf
+WHERE sf.tool_name = 'edit'
+GROUP BY sf.file_path ORDER BY session_count DESC LIMIT 20;
+```
+
+**Find sessions matching a skill's domain** (FTS5 with synonym expansion):
+```sql
+SELECT content, session_id, source_type
+FROM search_index
+WHERE search_index MATCH 'auth OR login OR token OR JWT'
+ORDER BY rank LIMIT 20;
+```
+
+**Recent session activity for a file pattern** (staleness check):
+```sql
+SELECT s.id, s.summary, s.updated_at, sf.file_path
+FROM session_files sf
+JOIN sessions s ON sf.session_id = s.id
+WHERE sf.file_path LIKE '%auth%'
+ORDER BY s.updated_at DESC LIMIT 10;
+```
+
+**User intent patterns** (what users repeatedly ask for):
+```sql
+SELECT substr(t.user_message, 1, 200) as request, COUNT(*) as occurrences
+FROM turns t
+WHERE t.turn_index = 0
+GROUP BY substr(t.user_message, 1, 200)
+ORDER BY occurrences DESC LIMIT 20;
+```
+
 ### Data Requirements
 
-Before proceeding with any workflow, assess the available data and set expectations:
+Before proceeding with any workflow, assess available data:
 
-- **Minimum for extraction:** 3–5 coding sessions with the session-logger hook active, producing at least 10 tool calls per session. Patterns need 2+ repetitions of 3+ step sequences to be detected.
-- **Minimum for evaluation:** At least one existing skill in `.github/skills/` AND session activity data from 3+ sessions (`.copilot/session-activity.jsonl` and `.copilot/session-activity.prev.jsonl`).
-- **Minimum for cleanup:** Same as evaluation — session activity data must exist to assess whether skills are still relevant.
+1. **Always query the session store first.** Use `sql` with `database: "session_store"` to check session count and recent activity:
+   ```sql
+   SELECT COUNT(*) as sessions, MAX(updated_at) as latest FROM sessions;
+   ```
+   - **3+ sessions:** Sufficient for evaluation and cleanup. Proceed directly.
+   - **10+ sessions:** Excellent — strong cross-session patterns are detectable.
+   - **Fewer than 3 sessions:** Tell the user more sessions are needed for reliable patterns.
 
-If the data is insufficient, explain clearly what the user needs to do and how long it typically takes: "Install the session-logger hook, work normally for 3–5 sessions, then come back. Each session should involve real coding tasks — quick Q&A sessions don't generate enough tool call patterns."
+2. **Check JSONL for extraction workflows.** Read `.copilot/session-activity.jsonl` if extraction is requested.
+   - **If missing:** Extraction still works at a reduced level using session store data (file patterns and user requests), but fine-grained tool sequences require the session-logger hook. Offer to install it.
+   - **If present but sparse** (fewer than 10 tool calls): Suggest accumulating more data.
+   - **If sufficient:** Use hybrid approach — session store for cross-session patterns, JSONL for tool sequences.
 
-1. **Check for session data.** Read `.copilot/session-activity.jsonl`.
-   - **If missing:** Tell the user: "I need session activity data to find patterns. Let me help you install the session-logger hook — after 3–5 normal coding sessions, I'll have enough data to work with." Offer to set up the hook using `ask_user`.
-   - **If present but sparse** (fewer than 10 tool calls): Tell the user: "I found session data, but there aren't enough tool calls yet to detect reliable patterns. Keep working normally — I need at least 3 sessions with 10+ tool calls each. Come back after a few more sessions."
-   - **If sufficient:** Proceed to step 2.
+3. **For evaluation and cleanup, session store alone is sufficient.** Do not block these workflows on JSONL availability — the session store provides user intent, file patterns, and activity history across all sessions.
 
-2. **Parse the activity log.** Each line is a JSONL entry. Common fields: `ts`, `tool`, `path`, `desc`, `cmd`, `intent`, `pattern`. Session boundaries are marked by `event: session_start` and `event: session_end` entries.
+### Extraction Workflow
 
-3. **Detect session phases.** Split the parsed session into phases using `report_intent` entries. Each `report_intent` entry with an `intent` field marks the start of a new phase. Label each phase with its intent text (e.g., "Exploring codebase", "Implementing auth fix", "Committing changes"). If no `report_intent` entries exist, treat the entire session as a single phase.
+1. **Query the session store for cross-session patterns.** Use `sql` with `database: "session_store"` to identify:
+   - **Repeated file patterns:** Which files are edited together across sessions?
+   - **Recurring user requests:** What do users repeatedly ask for? (query `turns` where `turn_index = 0`)
+   - **File co-editing clusters:** Which files always appear in the same sessions? (join `session_files` on `session_id`)
+   
+   This gives you the _breadth_ view — patterns that repeat across 5, 10, 50+ sessions are high-confidence candidates.
+
+2. **Load JSONL for tool-level detail (if available).** Read `.copilot/session-activity.jsonl`.
+   Each line is a JSONL entry. Common fields: `ts`, `tool`, `path`, `desc`, `cmd`, `intent`, `pattern`. Session boundaries are marked by `event: session_start` and `event: session_end` entries.
+   - **If JSONL is available:** Continue to step 3 for phase detection and tool-sequence analysis.
+   - **If JSONL is missing:** Skip steps 3–4. Use session store patterns from step 1 alone — you can still detect file co-editing clusters and recurring requests, but cannot detect tool-call sequences. Note this limitation when presenting candidates.
+
+3. **Detect session phases (JSONL only).** Split the parsed session into phases using `report_intent` entries. Each `report_intent` entry with an `intent` field marks the start of a new phase. Label each phase with its intent text (e.g., "Exploring codebase", "Implementing auth fix", "Committing changes"). If no `report_intent` entries exist, treat the entire session as a single phase.
 
    Phases reveal workflow structure:
    - **Explore phase** — dominated by `view`, `grep`, `glob` calls
@@ -44,13 +124,18 @@ If the data is insufficient, explain clearly what the user needs to do and how l
 
    Phase-level patterns (e.g., "every implementation task follows Explore → Plan → Implement → Release") are higher-value skill candidates than raw tool sequences because they capture workflow intent, not just tool mechanics.
 
-4. **Identify repeatable patterns.** Look for patterns at two levels:
+4. **Identify repeatable patterns.** Combine session store and JSONL signals:
 
-   **Phase-level patterns** (higher value):
+   **Cross-session patterns (from session store):**
+   - **File co-editing clusters** — Files that appear together in 3+ sessions (query `session_files` grouped by `session_id`)
+   - **Recurring request types** — Similar user prompts appearing across sessions (FTS5 search on `search_index`)
+   - **Domain hotspots** — File paths or directories that are repeatedly edited (high `session_count` in file queries)
+
+   **Phase-level patterns (from JSONL, higher value):**
    - **Phase sequences** — The same phase types appearing in the same order across sessions (e.g., Explore → Implement → Test is a consistent workflow)
    - **Phase templates** — A specific phase type always contains the same tool sequence (e.g., every "Release" phase is: `powershell`(git add) → `powershell`(git commit) → `powershell`(git push))
 
-   **Tool-level patterns** (within a single phase):
+   **Tool-level patterns (from JSONL, within a single phase):**
    - **Repeated sequences** — Same chain of 3+ tool calls appearing 2+ times (same tools in same order, similar path shapes)
    - **Paired file operations** — Editing `*.ts` always followed by editing `*.test.ts`
    - **Recurring commands** — Same shell command with different arguments (parameterize them)
@@ -58,6 +143,7 @@ If the data is insufficient, explain clearly what the user needs to do and how l
 
 5. **Score and rank candidates.** Assign confidence based on:
    - Repetition count (2× = medium, 3+× = high)
+   - **Cross-session evidence** — Patterns confirmed by session store data across many sessions score higher than JSONL-only patterns from 1-2 sessions
    - Sequence length (longer = more valuable)
    - Consistency (same order every time = higher confidence)
    - **Phase awareness** — Patterns that span a complete phase score 1.5× higher than phase-fragments. Phase-level patterns (sequences of phases) score 2× higher than tool-level patterns.
@@ -85,14 +171,37 @@ When the user asks to "evaluate skills", "improve skills", or "audit skills", fo
 
 1. **Inventory existing skills.** Use `glob` to find all `.github/skills/*/SKILL.md` files. Read each one to extract: name, description, workflow steps, file patterns, allowed-tools.
 
-2. **Load recent session activity.** Read `.copilot/session-activity.jsonl` (and `.copilot/session-activity.prev.jsonl` if available) to understand actual recent usage patterns.
+2. **Query the session store for usage evidence.** Use `sql` with `database: "session_store"` to build an activity profile across all sessions:
 
-3. **Evaluate each skill.** For every skill in the inventory, assess:
+   - **Skill relevance:** For each skill, search `search_index` (FTS5) using keywords from the skill's description and file patterns. Count matching sessions to measure how often the skill's domain appears.
+     ```sql
+     SELECT COUNT(DISTINCT session_id) as sessions_matched
+     FROM search_index
+     WHERE search_index MATCH '<skill keywords>'
+     ```
+   - **File pattern activity:** Check whether the skill's file patterns appear in `session_files`:
+     ```sql
+     SELECT sf.file_path, COUNT(DISTINCT sf.session_id) as session_count, MAX(s.updated_at) as last_active
+     FROM session_files sf JOIN sessions s ON sf.session_id = s.id
+     WHERE sf.file_path LIKE '%<pattern>%'
+     GROUP BY sf.file_path ORDER BY session_count DESC
+     ```
+   - **User intent matching:** Search first-turn user messages for requests related to the skill:
+     ```sql
+     SELECT s.id, substr(t.user_message, 1, 200) as request, s.updated_at
+     FROM turns t JOIN sessions s ON t.session_id = s.id
+     WHERE t.turn_index = 0 AND (t.user_message LIKE '%keyword1%' OR t.user_message LIKE '%keyword2%')
+     ORDER BY s.updated_at DESC
+     ```
 
-   - **Activity alignment** — Compare the skill's expected workflow steps against actual tool call sequences in recent session logs. If no recent sessions contain tool sequences matching the skill's workflow, flag as potentially unused.
-   - **Trigger accuracy** — Compare the skill's `description` field against the actual session contexts where it would be relevant. If the description seems too broad or too narrow based on session activity patterns, flag it.
-   - **Workflow drift** — Compare the skill's documented workflow steps against actual tool call sequences from sessions that match the skill's expected patterns. If users consistently deviate from the documented steps, propose an updated workflow.
-   - **File pattern staleness** — Use `glob` to check whether the skill's declared file patterns still match existing files. Flag patterns that match zero files.
+   Optionally layer in `.copilot/session-activity.jsonl` for tool-level sequence detail if available.
+
+3. **Evaluate each skill.** For every skill in the inventory, assess using session store data (all sessions) and optionally JSONL (tool-level detail):
+
+   - **Activity alignment** — Check how many sessions in the store match the skill's domain (from step 2 queries). If zero sessions match across all history, the skill is likely unused. If sessions match but only in older history, flag as declining relevance.
+   - **Trigger accuracy** — Compare the skill's `description` keywords against FTS5 search results. If sessions matching the description don't involve the skill's file patterns, the trigger is too broad. If sessions working with the skill's files don't match the description, it's too narrow.
+   - **Workflow drift** — If JSONL is available, compare the skill's documented workflow steps against actual tool call sequences. If only session store is available, check whether the file patterns and user intents still align with the skill's documented scope.
+   - **File pattern staleness** — Use `glob` to check whether the skill's declared file patterns still match existing files. Also check `session_files` to see if those files were recently edited. Flag patterns that match zero files or have no recent session activity.
 
 4. **Categorize findings.** Group results into three tiers:
    - 🔴 **Action needed** — Skill is broken (patterns match nothing) or severely drifted (workflow completely different from actual usage)
@@ -142,12 +251,32 @@ When converting specific session activity into reusable skill definitions:
 
 When the user asks to "clean up skills", "remove stale skills", or "archive unused skills", follow this workflow.
 
-1. **Inventory skills and session data.** Same as evaluation steps 1-2 — read all skills and recent session activity logs.
+1. **Inventory skills and query session store.** Use `glob` to find all `.github/skills/*/SKILL.md` files. Then query the session store to build a complete activity profile:
+
+   ```sql
+   -- Check total session history available
+   SELECT COUNT(*) as total_sessions, MIN(created_at) as earliest, MAX(updated_at) as latest FROM sessions;
+   ```
+
+   For each skill, query the session store for matching activity:
+   ```sql
+   -- Sessions matching skill domain (FTS5)
+   SELECT COUNT(DISTINCT session_id) as match_count
+   FROM search_index WHERE search_index MATCH '<skill keywords>';
+   
+   -- File pattern activity across all sessions
+   SELECT sf.file_path, COUNT(DISTINCT sf.session_id) as session_count, MAX(s.updated_at) as last_active
+   FROM session_files sf JOIN sessions s ON sf.session_id = s.id
+   WHERE sf.file_path LIKE '%<pattern>%'
+   GROUP BY sf.file_path;
+   ```
+
+   JSONL is **not needed** for cleanup — the session store provides superior coverage across all sessions.
 
 2. **Identify cleanup candidates.** Flag skills that meet ANY of these criteria:
-   - No recent session activity matches the skill's expected workflow (skill appears unused)
-   - Skill file hasn't been modified in over 60 days and no session patterns match its workflow
-   - File patterns match zero existing files (completely stale)
+   - No sessions in the store match the skill's domain (FTS5 search returns zero results across all history)
+   - Skill's file patterns have no activity in `session_files` and `glob` matches zero existing files
+   - File patterns exist on disk but have zero session activity in the last 30+ sessions (declining relevance)
 
 3. **Present candidates.** Use `ask_user` with a multi-select listing each candidate with its reason:
 
