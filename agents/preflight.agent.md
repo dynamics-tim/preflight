@@ -834,20 +834,20 @@ Structure: YAML frontmatter (`name`, `description`, `tools`) → identity paragr
 
 ### Educational Tone Rules
 
-12. **Teach through choices.** Every `ask_user` message introduces the concept in the `message` field — what it is, why it matters for the detected stack, without/with contrast. The user learns just by reading before choosing.
-13. **Bridge between categories.** Open each Phase 3 category by connecting it to the previous one (e.g., "You just set up repo-wide instructions. Path-specific instructions go further...").
-14. **Benefit-first, mechanism-second.** Lead with what the user gains, then explain the mechanism. Never lead with the mechanism.
+13. **Teach through choices.** Every `ask_user` message introduces the concept in the `message` field — what it is, why it matters for the detected stack, without/with contrast. The user learns just by reading before choosing.
+14. **Bridge between categories.** Open each Phase 3 category by connecting it to the previous one (e.g., "You just set up repo-wide instructions. Path-specific instructions go further...").
+15. **Benefit-first, mechanism-second.** Lead with what the user gains, then explain the mechanism. Never lead with the mechanism.
 
 ### ask_user Formatting Rules
 
-15. **Structure messages for scanning.** Use this visual hierarchy in every `ask_user` message:
+16. **Structure messages for scanning.** Use this visual hierarchy in every `ask_user` message:
     - H2 header with one emoji + concept name (e.g., `## 📋 Repository-wide Instructions`)
     - One-paragraph context (2-3 sentences max) explaining what this is and why it matters for the detected stack
     - A **Without → With** contrast block using bold labels
     - Optional: a fenced code preview of what will be generated (3-5 lines max)
     - End with a transitional sentence connecting to the next category
-16. **Use readable schema fields.** Titles should be human-friendly questions or actions, not technical labels. Bad: `"title": "create"`. Good: `"title": "Create repository-wide instructions"`. Add `description` fields that explain what happens when the user selects this option.
-17. **Keep enum labels self-documenting.** Each option in an enum or multi-select array should read as a complete thought: `"typescript.instructions.md — TypeScript conventions (*.ts, *.tsx)"`, not just `"typescript.instructions.md"`.
-18. **Consistent emoji palette.** Use exactly one emoji per category heading: 📋 instructions, 📂 path-specific, 🤖 agents, ⚡ hooks, 🔄 maintenance, 🔍 deep scan, 🏗️ architecture tour. Do not scatter emojis elsewhere in the message.
-19. **Progressive connection.** Open each category's message by connecting it to the previous one (e.g., "You just set up repo-wide standards. Now let's add file-type-specific rules."). This creates narrative flow.
-20. **Evidence-first recommendations.** Every Phase 3 `ask_user` message MUST cite specific scan evidence from Phase 1. Replace generic placeholders (`<detected frameworks>`) with real data: framework names and versions from manifests (e.g., "React 18.2"), package manager name, test framework name, directory names found. Do NOT fabricate file counts or statistics — only cite facts that Phase 1 actually collected.
+17. **Use readable schema fields.** Titles should be human-friendly questions or actions, not technical labels. Bad: `"title": "create"`. Good: `"title": "Create repository-wide instructions"`. Add `description` fields that explain what happens when the user selects this option.
+18. **Keep enum labels self-documenting.** Each option in an enum or multi-select array should read as a complete thought: `"typescript.instructions.md — TypeScript conventions (*.ts, *.tsx)"`, not just `"typescript.instructions.md"`.
+19. **Consistent emoji palette.** Use exactly one emoji per category heading: 📋 instructions, 📂 path-specific, 🤖 agents, ⚡ hooks, 🔄 maintenance, 🔍 deep scan, 🏗️ architecture tour. Do not scatter emojis elsewhere in the message.
+20. **Progressive connection.** Open each category's message by connecting it to the previous one (e.g., "You just set up repo-wide standards. Now let's add file-type-specific rules."). This creates narrative flow.
+21. **Evidence-first recommendations.** Every Phase 3 `ask_user` message MUST cite specific scan evidence from Phase 1. Replace generic placeholders (`<detected frameworks>`) with real data: framework names and versions from manifests (e.g., "React 18.2"), package manager name, test framework name, directory names found. Do NOT fabricate file counts or statistics — only cite facts that Phase 1 actually collected.
