@@ -258,9 +258,10 @@ If the project already has substantial Copilot configuration, use `ask_user` to 
 
 - If the user picks **"audit"**, run the audit workflow:
   1. **Validate** — Read all managed files (those with `<!-- managed-by: preflight -->` markers). Check YAML frontmatter parses, required fields present, markers balanced, hook JSON valid.
-  2. **Compare** — Diff current Phase 1 scan results against stored `detectedStack` in `.preflight-state.json`. Identify drift: new frameworks added, old ones removed, version changes.
-  3. **Report** — Present findings with evidence: "Your config references React but package.json now shows Astro 4.1. Tests instructions reference Jest but vitest is now in devDependencies."
-  4. **Suggest** — Use `ask_user` with a multi-select array listing specific improvements (e.g., "Update copilot-instructions.md to reference Astro instead of React", "Add vitest conventions to tests.instructions.md"). Only suggest changes backed by scan evidence.
+  2. **Count heuristic** — While reading instruction files, scan for specific numeric counts (regex: `\b\d+\s+(controller|builder|class|service|handler|endpoint|route|component|model|test|file)s?\b`). Each match is a staleness signal — these numbers were accurate at generation time but drift immediately. Flag each occurrence as "likely stale count" with the file name and matched text.
+  3. **Compare** — Diff current Phase 1 scan results against stored `detectedStack` in `.preflight-state.json`. Identify drift: new frameworks added, old ones removed, version changes.
+  4. **Report** — Present findings with evidence: "Your config references React but package.json now shows Astro 4.1. Tests instructions reference Jest but vitest is now in devDependencies." Also list any stale-count flags: "Found '18 controllers' in copilot-instructions.md — replace with a relative description so it stays accurate as the codebase grows."
+  5. **Suggest** — Use `ask_user` with a multi-select array listing specific improvements (e.g., "Update copilot-instructions.md to reference Astro instead of React", "Add vitest conventions to tests.instructions.md", "Remove stale count '18 controllers' from copilot-instructions.md"). Only suggest changes backed by scan evidence.
 - If the user picks **"additive"**, proceed normally (additive — never overwrite unmanaged files).
 - If the user **declines** the form, proceed with normal setup.
 
@@ -568,7 +569,7 @@ Use `ask_user` with a structured form:
 
 ```json
 {
-  "message": "🔄 **Config maintenance** (`.github/hooks/config-freshness.json`)\n\nYou just set up session learning. This last hook keeps everything fresh — your project evolves, and this checks once at session start: if your config is stale, it shows a one-line reminder. Commit it once, every team member benefits.",
+  "message": "🔄 **Config maintenance** (`.github/hooks/config-freshness.json`)\n\nYou just set up session learning. This last hook keeps everything fresh — your project evolves, and this checks once at session start: if your config is stale, it shows a one-line reminder. Commit it once, every team member benefits.\n\nFor deeper drift — like instruction files that reference stale patterns after a big refactor — run `@preflight audit` anytime.",
   "requestedSchema": {
     "properties": {
       "install": {
