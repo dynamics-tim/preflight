@@ -46,6 +46,16 @@ improve the quality of generated Copilot instructions.
    - Max line length
    - Trailing commas
 
+6. **Test infrastructure patterns** — Read 3–5 test files from `tests/`, `test/`,
+   `spec/`, or `__tests__/` directories. Detect:
+   - **Test base classes**: Does each test class extend a custom base (e.g., `PluginTest<T>`, `IntegrationTestBase`)? If so, name it.
+   - **Injection/mock framework**: Look for `new Mock<T>()`, `Substitute.For<T>()`, `ServiceLocator.Substitute<T>()`, `FakeItEasy`, or custom fake classes registered via a service locator. Record the exact pattern used.
+   - **Fake/stub classes**: Look for classes named `Fake*`, `Stub*`, `Mock*` in the test directories. List their names — these are the project's canonical fakes, and generated agents should reference them by name.
+   - **Builder pattern**: Look for `*Builder` classes with a fluent `With*()` → `Build()` API. Note the directory they live in.
+   - **Mother/factory pattern**: Look for `*Mother` or `*Factory` classes with static methods returning test objects. Note the directory.
+   - **Custom assertion helpers**: Look for `*Assertions`, `*Extensions` in the test namespace, or fluent assertions libraries (FluentAssertions, Shouldly).
+   - **No detection = say so explicitly**: If no custom test infrastructure is found, report "Standard framework defaults detected — no custom injection/fake pattern." This is equally important — it tells the caller not to override defaults.
+
 ## Output
 
 Present findings as a structured list of observations, grouped by category.
@@ -77,4 +87,12 @@ Example output format:
 - Indent: 2 spaces
 - Trailing commas: all
 - Max line length: 100
+
+### Test Infrastructure
+- Test base class: none detected (tests extend no shared base)
+- Injection pattern: ServiceLocator.Substitute<T>() (custom DI, not Moq/NSubstitute)
+- Fake services: FakeHttpService (custom), registered via ServiceLocator
+- Builder pattern: *Builder classes in test/ObjectBuilders/ (fluent API)
+- Mother pattern: *Mother classes in test/ObjectMothers/ (static factory methods)
+- No detected use of Moq, NSubstitute, or FakeItEasy
 ```

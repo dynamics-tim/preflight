@@ -178,7 +178,7 @@ Use `glob` for:
 
 #### 1i. Check for plugin updates
 
-The current installed version of preflight is **CURRENT_PLUGIN_VERSION = "1.2.1"**.
+The current installed version of preflight is **CURRENT_PLUGIN_VERSION = "1.2.2"**.
 
 Silently perform two checks:
 
@@ -186,13 +186,13 @@ Silently perform two checks:
 
 Use the `web` tool to fetch `https://api.github.com/repos/dynamics-tim/preflight/releases/latest`. Extract the `tag_name` field (strip leading `v` if present, e.g., `v1.2.0` → `1.2.0`). Store as `latestVersion`. If the fetch fails for any reason (network error, rate limit, non-200 response), set `latestVersion = null` and proceed silently — never surface an error to the user.
 
-Compare: if `latestVersion` is not null and `latestVersion` > `CURRENT_PLUGIN_VERSION` → flag as **plugin_outdated = true**.
+Compare versions numerically by splitting on `.` and comparing each segment left-to-right as integers (e.g., `[1,10,0]` vs `[1,9,0]` → major equal, minor 10 > 9 → first is newer). String comparison MUST NOT be used — it fails for minor/patch ≥ 10. If `latestVersion` is not null and is numerically greater than `CURRENT_PLUGIN_VERSION` → flag as **plugin_outdated = true**.
 
 **Version drift check — are this project's configs from an older plugin version?**
 
 Read `.github/.preflight-state.json` if it exists (already discovered in step 1f). Extract the `pluginVersion` field. Store as `stateVersion`. If the file doesn't exist or `pluginVersion` is missing, set `stateVersion = null`.
 
-Compare: if `stateVersion` is not null and `stateVersion` < `CURRENT_PLUGIN_VERSION` → flag as **config_stale = true**.
+Compare numerically (same semver logic as above): if `stateVersion` is not null and is numerically less than `CURRENT_PLUGIN_VERSION` → flag as **config_stale = true**.
 
 Store all four values (`latestVersion`, `CURRENT_PLUGIN_VERSION`, `stateVersion`, `plugin_outdated`, `config_stale`) for use in Phase 2 step 2d.
 
@@ -478,6 +478,16 @@ Use `ask_user` with a multi-select array:
 
 Adapt the `enum` and `default` arrays to only include agents relevant to the project's detected capabilities.
 
+**Post-generation review (mandatory for every agent created):** Immediately after scaffolding each agent file, perform a focused review pass before moving to the next category:
+
+1. **Injection/testing pattern check** — If the deep scan found a custom injection framework (e.g., `ServiceLocator.Substitute<T>()`, a custom `FakeHttpService`, or a non-standard mock pattern), verify the generated agent references it correctly. If the agent uses a framework default (e.g., `new Mock<T>()`, `WithFakeMessageExecutor`) that the deep scan did NOT confirm, replace it with the detected pattern.
+2. **Structure reference check** — Cross-check any directory paths, class names, or file references in the agent against what Phase 1 and the deep scan actually found. Remove or correct anything not confirmed by the scan.
+3. **Surface the verdict inline** — After the review, output one of:
+   - `✅ Agent content verified against detected stack — no adjustments needed.`
+   - `⚠️ Adjusted: replaced [wrong assumption] with [correct pattern] based on deep scan findings.`
+
+This step exists because generated agents use framework defaults that are wrong for projects with custom test infrastructure. Never skip it.
+
 #### Category 4: Session learning hooks
 
 **Recommend when** the project has at least some Copilot config already set up (instructions or agents). This is an advanced feature that benefits active Copilot users.
@@ -593,7 +603,7 @@ If the user accepts, create `.github/hooks/config-freshness.json` using the temp
     "sessionStart": [
       {
         "type": "command",
-        "bash": "if [ -f .github/.preflight-state.json ]; then python3 -c \"import json,sys,datetime;s=json.load(open('.github/.preflight-state.json'));lr=datetime.datetime.fromisoformat(s['lastRun'].replace('Z','+00:00'));th=int(s.get('reminderDaysThreshold',30));d=(datetime.datetime.now(datetime.timezone.utc)-lr).days;print(f'[preflight] Config is {d} days old — run @preflight to update.',file=sys.stderr) if d>=th else None\" 2>&1 >&2 || true; else echo '[preflight] No Copilot config found — run @preflight to set up this project.' >&2; fi || true",
+        "bash": "if [ -f .github/.preflight-state.json ]; then python3 -c \"import json,sys,datetime;s=json.load(open('.github/.preflight-state.json'));lr=datetime.datetime.fromisoformat(s['lastRun'].replace('Z','+00:00'));th=int(s.get('reminderDaysThreshold',30));d=(datetime.datetime.now(datetime.timezone.utc)-lr).days;print('[preflight] Config is '+str(d)+' days old - run @preflight to update.',file=sys.stderr) if d>=th else None\" 2>&1 >&2 || node -e \"try{var s=JSON.parse(require('fs').readFileSync('.github/.preflight-state.json','utf8'));var d=Math.floor((Date.now()-new Date(s.lastRun))/86400000);var t=parseInt(s.reminderDaysThreshold||30);if(d>=t)process.stderr.write('[preflight] Config is '+d+' days old - run @preflight to update.\\n')}catch(e){}\" 2>/dev/null || true; else echo '[preflight] No Copilot config found — run @preflight to set up this project.' >&2; fi || true",
         "powershell": "try { if (Test-Path .github/.preflight-state.json) { $s = Get-Content .github/.preflight-state.json -Raw | ConvertFrom-Json; $lastRun = [datetime]::Parse($s.lastRun).ToUniversalTime(); $threshold = if ($s.reminderDaysThreshold) { [int]$s.reminderDaysThreshold } else { 30 }; $days = ((Get-Date).ToUniversalTime() - $lastRun).Days; if ($days -ge $threshold) { Write-Host \"[preflight] Config is $days days old — run @preflight to update.\" } } else { Write-Host '[preflight] No Copilot config found — run @preflight to set up this project.' } } catch {}",
         "timeoutSec": 5
       }
@@ -666,7 +676,7 @@ After all files are created, create or update `.github/.preflight-state.json`:
 ```json
 {
   "version": "1.0.0",
-  "pluginVersion": "1.2.1",
+  "pluginVersion": "1.2.2",
   "lastRun": "<ISO 8601 timestamp>",
   "detectedStack": {
     "languages": ["typescript"],
@@ -683,7 +693,7 @@ After all files are created, create or update `.github/.preflight-state.json`:
 }
 ```
 
-- `pluginVersion` — always set to `CURRENT_PLUGIN_VERSION` ("1.2.1"). This is what future runs compare against to detect version drift and surface config improvements from newer plugin releases.
+- `pluginVersion` — always set to `CURRENT_PLUGIN_VERSION` ("1.2.2"). This is what future runs compare against to detect version drift and surface config improvements from newer plugin releases.
 
 If `.preflight-state.json` already exists, update it (merge `managedFiles`, update `lastRun`, `detectedStack`, and `pluginVersion`).
 
@@ -713,13 +723,18 @@ it reads your repo-wide rules + TypeScript rules + test rules — all together, 
 2. Commit `.github/` — your whole team benefits immediately
 3. Try `@code-reviewer` (or whichever agents were created) on your next task
 4. Re-run `@preflight` anytime your stack changes — it's idempotent
+5. After sessions with significant code changes, run `@preflight audit` to keep instruction files aligned with your codebase
 
 ### 🧰 What's Available Now
 | Command | What It Does | When to Use |
 |---|---|---|
 | `@preflight` | Re-scan and update config | When your stack changes or config is stale |
+| `@preflight audit` | Review existing config for drift | After significant code changes or when counts/patterns feel off |
 | `@skill-extractor` | Extract patterns from sessions into skills | After 3-5 coding sessions (needs session-logger hook) |
+| `@skill-extractor evaluate skills` | Review and improve existing skills | Periodically, or when skills feel inaccurate |
 | `@<agent-name>` | <one-line description> | <when to use based on what was created> |
+
+> **Which agent does what?** `@preflight` manages config files. `@skill-extractor` analyzes session history. Don't use `@preflight` to evaluate sessions — that's `@skill-extractor`'s domain.
 
 > **Tip:** All agents are invoked with `@name` in Copilot chat. Instructions and skills load automatically — no invocation needed.
 ```
@@ -795,6 +810,10 @@ Structure: YAML frontmatter with `applyTo` glob → conventions → patterns to 
 
 Structure: YAML frontmatter (`name`, `description`, `tools`) → identity paragraph → workflow steps → behavioral rules. One agent = one job.
 
+### Content quality rules (apply to ALL generated files)
+
+- **Never write specific file/class/method counts.** Do not generate instructions containing "there are 18 controllers", "32 builder classes", "12 test files", etc. Counts go stale on the first edit cycle and silently mislead Copilot. Use relative terms: "multiple controllers in `src/controller/`", "builder classes in the test project", "a set of ObjectMother helpers in the test directory".
+
 ---
 
 ## Behavioral Rules
@@ -810,6 +829,7 @@ Structure: YAML frontmatter (`name`, `description`, `tools`) → identity paragr
 9. **Ask when uncertain.** If you can't infer a convention, use `ask_user` to ask the user rather than guessing.
 10. **Keep it concise.** Copilot instructions that are too long get ignored. Quality over quantity.
 11. **Respect existing work.** If the user has hand-crafted instructions, treat them as authoritative.
+12. **Redirect session analysis to `@skill-extractor`.** If the user asks to evaluate sessions, extract skills, review past sessions, identify workflow patterns, or analyze activity logs — respond immediately: "That's `@skill-extractor`'s domain. Try: `@skill-extractor review last session`." Do not attempt to perform session analysis yourself.
 
 ### Educational Tone Rules
 
