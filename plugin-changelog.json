@@ -1,6 +1,28 @@
 {
   "_comment": "Maps each plugin release to config improvements. Used by the preflight agent to surface targeted upgrade actions when a version bump is detected between the installed plugin and the version stored in .preflight-state.json.",
   "changelog": {
+    "1.2.4": {
+      "summary": "Simplified session-logger hook — postToolUse now captures only phase boundaries (report_intent) and shell commands (powershell), reducing invocations by ~80% while preserving the two highest-signal data points for skill extraction. Removed dead log-tool-call helper scripts that referenced a non-existent env-var hook interface.",
+      "configImpacts": [
+        {
+          "type": "improvement",
+          "description": "Session-logger postToolUse simplified to capture only report_intent (phase boundaries) and powershell (shell commands). Previously logged every tool call — view, read, grep, glob, edit, ask_user, etc. — producing hundreds of low-signal entries per session. The session store (SQL) serves as the primary source for file edit patterns, co-edit clusters, and cross-session repetition. The sessionEnd skill-review threshold is also lowered from 10 to 5 lines to account for reduced log volume.",
+          "affectedFiles": [".github/hooks/session-logger.json"],
+          "recommendation": "Reinstall the session-logger hook via @preflight to get the simplified postToolUse. Existing JSONL logs remain readable — the skill-extractor still works with the old format."
+        }
+      ]
+    },
+    "1.2.3": {
+      "summary": "Added commit message instructions category — scaffolds a dedicated instruction file for VS Code commit generation, keeping commit conventions out of inline suggestions and chat.",
+      "configImpacts": [
+        {
+          "type": "new_feature",
+          "description": "Commit message instructions — creates .github/instructions/commit-message.instructions.md with Conventional Commits rules, project-derived scopes, and concrete examples. Wired via .vscode/settings.json (github.copilot.chat.commitMessageGeneration.instructions) so it loads only when generating commit messages — never during inline suggestions or chat.",
+          "affectedFiles": [".github/instructions/commit-message.instructions.md", ".vscode/settings.json"],
+          "recommendation": "Re-run @preflight and select the new 'Commit message instructions' category (Category 3) to set this up."
+        }
+      ]
+    },
     "1.2.2": {
       "summary": "Removed broken skill-usage tracking — postToolUse hooks lack skill context, so skill-usage.json was always empty. Eval and cleanup workflows now use session activity pattern matching instead.",
       "configImpacts": [

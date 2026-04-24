@@ -70,18 +70,15 @@ ORDER BY s.updated_at DESC LIMIT 10;
 Located at `.copilot/session-activity.jsonl`. Requires session-logger hook installation.
 Provides fine-grained tool call sequences and phase boundaries not available in the session store.
 
-**Use JSONL for:** tool-call-level sequence detection (view→edit→test chains), phase boundary analysis via `report_intent`, command argument patterns.
+**Use JSONL for:** phase boundary analysis via `report_intent`, command argument patterns via `powershell`. Only these two tool types are logged by the simplified hook.
 **Not needed for:** evaluation, cleanup, cross-session repetition detection — session store is sufficient and superior.
 
 ## JSONL Log Format
 
 Each line in `.copilot/session-activity.jsonl` is a JSON object.
 
-**Minimal**: `{"ts":"...","tool":"view"}`
-**With context**: `{"ts":"...","tool":"edit","path":"src/utils.ts","desc":"Update auth logic"}`
-**With command**: `{"ts":"...","tool":"powershell","desc":"Run tests","cmd":"npm test"}`
-**With intent**: `{"ts":"...","tool":"report_intent","intent":"Implementing auth module"}`
-**With pattern**: `{"ts":"...","tool":"grep","pattern":"handleAuth","path":"src/"}`
+**Minimal**: `{"ts":"...","tool":"report_intent","intent":"Implementing auth module"}`
+**With command**: `{"ts":"...","tool":"powershell","cmd":"npm test"}`
 **Boundaries**: `{"ts":"...","event":"session_start","cwd":"project-name"}` / `{"event":"session_end"}`
 
 If the JSONL log is missing, the session-logger hook needs to be installed for tool-level extraction.
@@ -93,14 +90,11 @@ Run `@preflight` to scaffold the hook.
 | Field | Present When | Description |
 |---|---|---|
 | `ts` | Always | ISO 8601 UTC timestamp |
-| `tool` | Tool call entries | Tool name: `view`, `edit`, `create`, `grep`, `glob`, `powershell`, `sql`, `ask_user`, `task`, `read_agent`, `report_intent`, etc. |
+| `tool` | Tool call entries | Tool name: only `report_intent` or `powershell` |
 | `event` | Boundary entries | `session_start` or `session_end` |
 | `cwd` | `session_start` | Working directory basename |
-| `path` | File operations | Repo-relative file path (e.g., `src/utils.ts`) |
-| `desc` | Tools with description arg | Human-readable description of the operation |
 | `cmd` | `powershell` | First 120 chars of the shell command |
 | `intent` | `report_intent` | Phase label (e.g., "Exploring codebase", "Implementing auth") |
-| `pattern` | `grep`, `glob` | The search pattern or glob used |
 
 ## Phase Boundaries
 
@@ -110,11 +104,9 @@ Use these to split sessions into named phases for more meaningful pattern detect
 Example session phases:
 ```
 {"tool":"report_intent","intent":"Exploring codebase"}    ← Phase 1
-{"tool":"view","path":"src/auth.ts"}
-{"tool":"grep","pattern":"handleLogin"}
+{"tool":"powershell","cmd":"find src -name '*.ts' | head"}
 {"tool":"report_intent","intent":"Implementing auth fix"}  ← Phase 2
-{"tool":"edit","path":"src/auth.ts"}
-{"tool":"powershell","cmd":"npm test"}
+{"tool":"powershell","cmd":"npm test -- --filter=auth"}
 {"tool":"report_intent","intent":"Committing changes"}     ← Phase 3
 {"tool":"powershell","cmd":"git add -A && git commit..."}
 ```
@@ -124,19 +116,19 @@ skill candidates than raw tool-level sequences because they capture workflow int
 
 ## Pattern Detection Heuristics
 
-### Sequence Detection
+### Phase Sequence Detection (via JSONL)
 
 Find chains of 3+ tool calls appearing 2+ times with the same tools in order
 and similar path shapes (ignore specific filenames).
 Example: `read → edit → execute(test)` repeated across different files.
 
-### Path Pattern Extraction
+### File Pattern Detection (via Session Store)
 
 Group tool calls by file path. Generalize specifics to globs:
 `src/components/Button.tsx` → `src/components/*.tsx`.
 Detect paired files: editing `*.ts` always followed by `*.test.ts`.
 
-### Command Template Detection
+### Command Template Detection (via JSONL)
 
 Find recurring `execute` commands with different arguments. Parameterize:
 `npm test -- --filter=Button` → `npm test -- --filter=<name>`.
@@ -156,7 +148,7 @@ Find recurring `execute` commands with different arguments. Parameterize:
 - Skill descriptions must be precise enough for Copilot to auto-match correctly
 - Generalized globs must not be too broad (`**/*` is useless)
 - Never create skills without user confirmation
-- Skip patterns with fewer than 3 steps or fewer than 10 log entries total
+- Skip patterns with fewer than 3 steps or fewer than 5 log entries total
 
 ## Evaluation Heuristics
 

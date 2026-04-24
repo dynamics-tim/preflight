@@ -150,6 +150,9 @@ Use `glob` to check for:
 - `CLAUDE.md`
 - `.cursorrules`
 - `copilot-setup-steps.yml` or `.github/copilot-setup-steps.yml`
+- `.vscode/settings.json`
+
+If `.vscode/settings.json` exists, `read` it and check whether `github.copilot.chat.commitMessageGeneration.instructions` is already present. Store as `vsCodeCommitSettingsExist` (bool).
 
 #### 1g. Detect CI/CD
 
@@ -176,9 +179,22 @@ Use `glob` for:
 - `.stylelintrc*`
 - `golangci-lint` config
 
-#### 1i. Check for plugin updates
+#### 1i. Detect commit conventions
 
-The current installed version of preflight is **CURRENT_PLUGIN_VERSION = "1.2.2"**.
+Use `glob` for:
+
+- `commitlint.config.*`, `.commitlintrc`, `.commitlintrc.json`, `.commitlintrc.yaml`, `.commitlintrc.yml`, `.commitlintrc.js`, `.commitlintrc.cjs`
+- `.husky/commit-msg`
+
+Also check `package.json` dependencies (already read in 1a) for `@commitlint/config-conventional` or `@commitlint/config-angular`.
+
+Store:
+- `commitConventionsDetected` (bool) — true if any commitlint config or husky commit-msg hook found, or `@commitlint` dep detected
+- `commitlintConfigFile` (string or null) — path to the first commitlint config found, if any
+
+
+
+The current installed version of preflight is **CURRENT_PLUGIN_VERSION = "1.2.4"**.
 
 Silently perform two checks:
 
@@ -433,7 +449,72 @@ Use `ask_user` with a multi-select array listing all detected instruction files,
 
 Adapt the `enum` and `default` arrays to the actual detected stack — only list items relevant to the project.
 
-#### Category 3: Custom agents
+#### Category 3: Commit message instructions
+
+**Always recommend** — commit message conventions are universally useful. Recommend more prominently (note in the `message`) when `commitConventionsDetected = true`.
+
+Files:
+- `.github/instructions/commit-message.instructions.md` — the instruction content
+- `.vscode/settings.json` — wires the file to commit generation only
+
+Use `ask_user` with a boolean:
+
+```json
+{
+  "message": "💬 **Commit message instructions** (`.github/instructions/commit-message.instructions.md`)\n\nYou just set up path-specific rules that load when editing code. This is a different kind: an instruction file that loads *only* when you hit ✨ to generate a commit message — it never pollutes inline suggestions or chat.\n\n**Without it:** Copilot guesses a commit style (or ignores your conventions entirely).\n**With it:** Every generated commit message follows Conventional Commits, uses your scopes, and matches your project's style automatically.\n\nI'll create the instruction file and add a single entry to `.vscode/settings.json` to wire it up.<if commitConventionsDetected>I also detected existing commit conventions tooling (<commitlintConfigFile or 'commitlint/husky'>), so I'll tailor the scopes and examples to your setup.</if>",
+  "requestedSchema": {
+    "properties": {
+      "create": {
+        "type": "boolean",
+        "title": "Create commit message instructions",
+        "description": "Creates .github/instructions/commit-message.instructions.md with Conventional Commits rules, project-derived scopes, and examples. Wires it in .vscode/settings.json so it only loads when generating commit messages.",
+        "default": true
+      }
+    },
+    "required": ["create"]
+  }
+}
+```
+
+If the user accepts:
+
+1. **Create `.github/instructions/commit-message.instructions.md`** using the rules in "Instruction Generation Rules" below. Wrap in managed markers. No `applyTo` frontmatter — this file is loaded via VS Code settings, not glob patterns.
+
+2. **Update or create `.vscode/settings.json`**:
+   - If the file does not exist → create it with only the commit generation key
+   - If the file exists and `github.copilot.chat.commitMessageGeneration.instructions` is not yet set → read the file, add the key, write it back
+   - If the key already exists (`vsCodeCommitSettingsExist = true`) → skip silently and note in the summary
+   - The setting value:
+     ```json
+     "github.copilot.chat.commitMessageGeneration.instructions": [
+       { "file": ".github/instructions/commit-message.instructions.md" }
+     ]
+     ```
+
+3. **Detect and clean misplaced commit section** — if `.github/copilot-instructions.md` was created or already exists, `read` it and check for a section that looks like a commit message guide (headers matching `/##?\s+(commit|conventional commits|commit messages?)/i`). If found, use `ask_user` with a boolean:
+
+```json
+{
+  "message": "I found a commit messages section in your `.github/copilot-instructions.md`. Since you now have a dedicated instruction file that loads only during commit generation, this section in the repo-wide file is redundant — and it loads on every Copilot interaction, not just commits.\n\nShould I remove the misplaced section from `.github/copilot-instructions.md`?",
+  "requestedSchema": {
+    "properties": {
+      "clean": {
+        "type": "boolean",
+        "title": "Remove misplaced commit messages section from copilot-instructions.md",
+        "description": "The section will be replaced by the dedicated commit-message.instructions.md file which loads only when generating commit messages",
+        "default": true
+      }
+    },
+    "required": ["clean"]
+  }
+}
+```
+
+If accepted, remove the misplaced section using the managed markers merge strategy.
+
+4. **Register** `.github/instructions/commit-message.instructions.md` in `managedFiles` in `.github/.preflight-state.json`.
+
+#### Category 4: Custom agents
 
 Only recommend if there's a clear use case. Common recommendations:
 
@@ -489,7 +570,7 @@ Adapt the `enum` and `default` arrays to only include agents relevant to the pro
 
 This step exists because generated agents use framework defaults that are wrong for projects with custom test infrastructure. Never skip it.
 
-#### Category 4: Session learning hooks
+#### Category 5: Session learning hooks
 
 **Recommend when** the project has at least some Copilot config already set up (instructions or agents). This is an advanced feature that benefits active Copilot users.
 
@@ -523,7 +604,7 @@ If the user accepts, create `.github/hooks/session-logger.json` using the templa
 ```json
 {
   "version": 1,
-  "_comment": "Session activity logger for skill extraction. Add .copilot/ to your .gitignore — logs are ephemeral. Hooks receive context as JSON via stdin.",
+  "_comment": "Selective session logger for skill extraction. Captures only phase boundaries (report_intent) and shell commands (powershell) — the highest-signal events for pattern detection. Full tool-call history is available in the session store (SQL). Add .copilot/ to your .gitignore — logs are ephemeral. Hooks receive context as JSON via stdin.",
   "hooks": {
     "sessionStart": [
       {
@@ -536,16 +617,16 @@ If the user accepts, create `.github/hooks/session-logger.json` using the templa
     "postToolUse": [
       {
         "type": "command",
-        "bash": "INPUT=$(cat); TOOL=$(echo \"$INPUT\" | jq -r '.toolName // \"unknown\"'); ARGS=$(echo \"$INPUT\" | jq -r '.toolArgs // \"\"'); if echo \"$ARGS\" | jq empty 2>/dev/null; then P=$(echo \"$ARGS\" | jq -r '.path // empty' 2>/dev/null); C=$(echo \"$ARGS\" | jq -r '.command // empty' 2>/dev/null); D=$(echo \"$ARGS\" | jq -r '.description // empty' 2>/dev/null); I=$(echo \"$ARGS\" | jq -r '.intent // empty' 2>/dev/null); PA=$(echo \"$ARGS\" | jq -r '.pattern // empty' 2>/dev/null); else P=$(echo \"$INPUT\" | jq -r '.toolArgs.path // empty' 2>/dev/null); C=$(echo \"$INPUT\" | jq -r '.toolArgs.command // empty' 2>/dev/null); D=$(echo \"$INPUT\" | jq -r '.toolArgs.description // empty' 2>/dev/null); I=$(echo \"$INPUT\" | jq -r '.toolArgs.intent // empty' 2>/dev/null); PA=$(echo \"$INPUT\" | jq -r '.toolArgs.pattern // empty' 2>/dev/null); fi; [ -n \"$P\" ] && GR=$(git rev-parse --show-toplevel 2>/dev/null) && [ -n \"$GR\" ] && P=\"${P#$GR/}\"; EX=''; [ -n \"$P\" ] && EX=\"$EX,\\\"path\\\":\\\"$P\\\"\"; [ -n \"$D\" ] && EX=\"$EX,\\\"desc\\\":\\\"$D\\\"\"; [ -n \"$I\" ] && EX=\"$EX,\\\"intent\\\":\\\"$I\\\"\"; [ -n \"$PA\" ] && EX=\"$EX,\\\"pattern\\\":\\\"$PA\\\"\"; [ -n \"$C\" ] && C=$(printf '%s' \"$C\" | head -c 120 | tr '\\n' ' ') && EX=\"$EX,\\\"cmd\\\":\\\"$(printf '%s' \"$C\" | sed 's/\\\\/\\\\\\\\/g;s/\"/\\\\\"/g')\\\"\"; mkdir -p .copilot && echo '{\"ts\":\"'$(date -u '+%Y-%m-%dT%H:%M:%SZ')'\",\"tool\":\"'\"$TOOL\"'\"'\"$EX\"'}' >> .copilot/session-activity.jsonl 2>/dev/null || true",
-        "powershell": "try { $in = [Console]::In.ReadToEnd() | ConvertFrom-Json; $tool = if ($in.toolName) { $in.toolName } else { 'unknown' }; $ex = ''; try { $a = if ($in.toolArgs -is [string]) { $in.toolArgs | ConvertFrom-Json } else { $in.toolArgs }; if ($a.path) { $pVal = $a.path -replace '\\\\','/'; $gr = (git rev-parse --show-toplevel 2>$null); if ($gr) { $gr = $gr.Trim() -replace '\\\\','/'; if ($pVal.StartsWith($gr + '/',[System.StringComparison]::OrdinalIgnoreCase)) { $pVal = $pVal.Substring($gr.Length + 1) } }; $ex += ',\"path\":\"' + $pVal + '\"' }; if ($a.description) { $ex += ',\"desc\":\"' + ($a.description -replace '\"','') + '\"' }; if ($a.intent) { $ex += ',\"intent\":\"' + ($a.intent -replace '\"','') + '\"' }; if ($a.pattern) { $ex += ',\"pattern\":\"' + ($a.pattern -replace '\"','') + '\"' }; if ($a.command) { $c = $a.command -replace \"`n\",' '; if ($c.Length -gt 120) { $c = $c.Substring(0,120) }; $ex += ',\"cmd\":\"' + ($c -replace '\\\\','\\\\' -replace '\"','\\\"') + '\"' } } catch {}; if (-not (Test-Path .copilot)) { New-Item -ItemType Directory -Path .copilot -Force | Out-Null }; Add-Content -Path .copilot/session-activity.jsonl -Value ('{\"ts\":\"' + (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ') + '\",\"tool\":\"' + $tool + '\"' + $ex + '}') -Encoding UTF8 } catch {}",
+        "bash": "INPUT=$(cat); TOOL=$(echo \"$INPUT\" | jq -r '.toolName // \"unknown\"'); case \"$TOOL\" in report_intent|powershell) A=$(echo \"$INPUT\" | jq -r '.toolArgs // \"{}\"'); EX=''; if [ \"$TOOL\" = \"report_intent\" ]; then I=$(echo \"$A\" | jq -r '.intent // empty' 2>/dev/null); [ -z \"$I\" ] && I=$(echo \"$INPUT\" | jq -r '.toolArgs.intent // empty' 2>/dev/null); [ -n \"$I\" ] && EX=\",\\\"intent\\\":\\\"$I\\\"\"; else C=$(echo \"$A\" | jq -r '.command // empty' 2>/dev/null); [ -z \"$C\" ] && C=$(echo \"$INPUT\" | jq -r '.toolArgs.command // empty' 2>/dev/null); [ -n \"$C\" ] && C=$(printf '%s' \"$C\" | head -c 120 | tr '\\n' ' ') && EX=\",\\\"cmd\\\":\\\"$(printf '%s' \"$C\" | sed 's/\\\\/\\\\\\\\/g;s/\"/\\\\\"/g')\\\"\"; fi; mkdir -p .copilot && echo '{\"ts\":\"'$(date -u '+%Y-%m-%dT%H:%M:%SZ')'\",\"tool\":\"'\"$TOOL\"'\"'\"$EX\"'}' >> .copilot/session-activity.jsonl 2>/dev/null || true;; esac || true",
+        "powershell": "try { $in = [Console]::In.ReadToEnd() | ConvertFrom-Json; $tool = if ($in.toolName) { $in.toolName } else { 'unknown' }; if ($tool -eq 'report_intent' -or $tool -eq 'powershell') { $ex = ''; try { $a = if ($in.toolArgs -is [string]) { $in.toolArgs | ConvertFrom-Json } else { $in.toolArgs }; if ($tool -eq 'report_intent' -and $a.intent) { $ex = ',\"intent\":\"' + ($a.intent -replace '\"','') + '\"' } elseif ($tool -eq 'powershell' -and $a.command) { $c = $a.command -replace \"`n\",' '; if ($c.Length -gt 120) { $c = $c.Substring(0,120) }; $ex = ',\"cmd\":\"' + ($c -replace '\\\\','\\\\' -replace '\"','\\\"') + '\"' } } catch {}; if (-not (Test-Path .copilot)) { New-Item -ItemType Directory -Path .copilot -Force | Out-Null }; Add-Content -Path .copilot/session-activity.jsonl -Value ('{\"ts\":\"' + (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ') + '\",\"tool\":\"' + $tool + '\"' + $ex + '}') -Encoding UTF8 } } catch {}",
         "timeoutSec": 5
       }
     ],
     "sessionEnd": [
       {
         "type": "command",
-        "bash": "mkdir -p .copilot && echo '{\"ts\":\"'$(date -u '+%Y-%m-%dT%H:%M:%SZ')'\",\"event\":\"session_end\"}' >> .copilot/session-activity.jsonl && LC=$(wc -l < .copilot/session-activity.jsonl 2>/dev/null || echo 0) && [ \"$LC\" -ge 10 ] && echo 'review' > .copilot/pending-skill-review || true",
-        "powershell": "if (-not (Test-Path .copilot)) { New-Item -ItemType Directory -Path .copilot -Force | Out-Null }; Add-Content -Path .copilot/session-activity.jsonl -Value ('{\"ts\":\"' + (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ') + '\",\"event\":\"session_end\"}') -Encoding UTF8; $lc = (Get-Content .copilot/session-activity.jsonl -ErrorAction SilentlyContinue | Measure-Object -Line).Lines; if ($lc -ge 10) { Set-Content -Path .copilot/pending-skill-review -Value 'review' -Encoding UTF8 }",
+        "bash": "mkdir -p .copilot && echo '{\"ts\":\"'$(date -u '+%Y-%m-%dT%H:%M:%SZ')'\",\"event\":\"session_end\"}' >> .copilot/session-activity.jsonl && LC=$(wc -l < .copilot/session-activity.jsonl 2>/dev/null || echo 0) && [ \"$LC\" -ge 5 ] && echo 'review' > .copilot/pending-skill-review || true",
+        "powershell": "if (-not (Test-Path .copilot)) { New-Item -ItemType Directory -Path .copilot -Force | Out-Null }; Add-Content -Path .copilot/session-activity.jsonl -Value ('{\"ts\":\"' + (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ') + '\",\"event\":\"session_end\"}') -Encoding UTF8; $lc = (Get-Content .copilot/session-activity.jsonl -ErrorAction SilentlyContinue | Measure-Object -Line).Lines; if ($lc -ge 5) { Set-Content -Path .copilot/pending-skill-review -Value 'review' -Encoding UTF8 }",
         "timeoutSec": 5
       }
     ]
@@ -557,7 +638,7 @@ Also append `.copilot/` to the project's `.gitignore` (create it if it doesn't e
 
 Add both files to the `managedFiles` array in `.preflight-state.json`.
 
-#### Category 5: Config maintenance
+#### Category 6: Config maintenance
 
 **Always recommend** when the project has a `.github/.preflight-state.json` from a previous run. Also recommend on first runs — it ensures future re-runs are prompted.
 
@@ -615,7 +696,7 @@ If the user accepts, create `.github/hooks/config-freshness.json` using the temp
 
 Add the hook file to the `managedFiles` array in `.preflight-state.json`. Also store `"reminderDaysThreshold"` in the state file (the value from the user's selection, or 30 if they accepted the default).
 
-#### Category 6: MCP config (optional — v2)
+#### Category 7: MCP config (optional — v2)
 
 If relevant, briefly mention: "MCP servers can connect Copilot to external tools (databases, APIs, etc.). This is an advanced feature best configured per-developer."
 
@@ -677,7 +758,7 @@ After all files are created, create or update `.github/.preflight-state.json`:
 ```json
 {
   "version": "1.0.0",
-  "pluginVersion": "1.2.2",
+  "pluginVersion": "1.2.4",
   "lastRun": "<ISO 8601 timestamp>",
   "detectedStack": {
     "languages": ["typescript"],
@@ -694,7 +775,7 @@ After all files are created, create or update `.github/.preflight-state.json`:
 }
 ```
 
-- `pluginVersion` — always set to `CURRENT_PLUGIN_VERSION` ("1.2.2"). This is what future runs compare against to detect version drift and surface config improvements from newer plugin releases.
+- `pluginVersion` — always set to `CURRENT_PLUGIN_VERSION` ("1.2.4"). This is what future runs compare against to detect version drift and surface config improvements from newer plugin releases.
 
 If `.preflight-state.json` already exists, update it (merge `managedFiles`, update `lastRun`, `detectedStack`, and `pluginVersion`).
 
@@ -806,6 +887,41 @@ Always wrap in managed markers:
 ### Path-specific instructions (`.github/instructions/*.instructions.md`)
 
 Structure: YAML frontmatter with `applyTo` glob → conventions → patterns to follow → anti-patterns. Target: 15–30 lines. Always include `<!-- managed-by: preflight -->` markers.
+
+### Commit message instructions (`.github/instructions/commit-message.instructions.md`)
+
+This file is loaded via `.vscode/settings.json`, not via `applyTo` glob. **Do NOT include `applyTo` frontmatter.** Include `<!-- managed-by: preflight -->` markers.
+
+Structure:
+1. **Format line** — `<type>(<scope>): <description>` with a short explanation
+2. **Types table** — the standard Conventional Commits types:
+
+   | Type | When to use |
+   |---|---|
+   | `feat` | New feature |
+   | `fix` | Bug fix |
+   | `docs` | Documentation only |
+   | `style` | Formatting, whitespace (no logic change) |
+   | `refactor` | Code restructuring without behavior change |
+   | `test` | Adding or updating tests |
+   | `chore` | Build process, tooling, dependencies |
+   | `perf` | Performance improvements |
+   | `ci` | CI/CD configuration changes |
+   | `build` | Build system changes |
+
+3. **Scopes** — derive from Phase 1 data:
+   - Monorepo: use workspace names from `packages/`, `apps/` directories found in 1d
+   - Single project with multiple top-level `src/` subdirectories: use those directory names (e.g., `api`, `auth`, `ui`, `core`)
+   - If no clear scope structure found: list a few examples based on the detected stack (e.g., `deps`, `config`, `ci`) and note that scopes are optional
+
+4. **Rules** — imperative mood, lowercase subject, no trailing period, ≤72 character subject line, `BREAKING CHANGE:` footer for breaking changes, `!` suffix for breaking type/scope
+
+5. **Examples** — 3 concrete examples using real stack names from Phase 1 detection:
+   - Use framework names, package manager, test framework, CI tool in the examples
+   - E.g., for a TypeScript + Next.js + Vitest project: `feat(auth): add JWT refresh token endpoint`, `test(api): add vitest coverage for user service`, `chore(deps): update next.js to 14.2`
+   - Include one with a body and one with `BREAKING CHANGE` footer
+
+Target: 30–50 lines. Always wrap in managed markers.
 
 ### Custom agents (`.github/agents/*.agent.md`)
 

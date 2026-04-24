@@ -1,7 +1,7 @@
 {
   "name": "preflight",
   "description": "Scans any codebase and scaffolds an optimized GitHub Copilot configuration interactively.",
-  "version": "1.2.2",
+  "version": "1.2.4",
   "author": {
     "name": "dynamics-tim"
   },
