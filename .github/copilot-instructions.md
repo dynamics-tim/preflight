@@ -24,6 +24,19 @@ plugin.json                     — Plugin manifest for `copilot plugin install`
 - **Two-part skill lifecycle:** Hooks can't invoke LLMs — so hooks log data (fast, <1ms) and agents analyze patterns (intelligent, interactive). The sessionEnd → sessionStart handoff uses a marker file. The skill-extractor manages the full lifecycle: extract → evaluate → improve → clean up.
 - **Native tools preferred:** The agent uses Copilot's native tools (glob, read, search, create, edit) for scanning — scripts are optional accelerators.
 
+## lean-ctx Tool Preference
+
+lean-ctx MCP is configured for this repo. When lean-ctx tools are available, prefer them over their native equivalents — they provide caching, compression, and cross-session memory that reduce token usage significantly:
+
+| Instead of | Use | Savings |
+|---|---|---|
+| `view` / `read` | `ctx_read` | 74–99% (cached re-reads ≈ 13 tok) |
+| `glob` / directory listing | `ctx_tree` | 34–60% |
+| `grep` / `search` | `ctx_search` | 50–80% |
+| `powershell` / `bash` | `ctx_shell` | 60–90% |
+
+Use `ctx_multi_read` to read multiple files in one round trip. At session start, use `ctx_session load` to restore prior context. If lean-ctx tools are unavailable, fall back to native tools transparently.
+
 ## Conventions
 
 - **File naming:** `kebab-case` everywhere (`code-reviewer.agent.md`, `scan.sh`)

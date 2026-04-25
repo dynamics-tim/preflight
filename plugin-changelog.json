@@ -1,6 +1,17 @@
 {
   "_comment": "Maps each plugin release to config improvements. Used by the preflight agent to surface targeted upgrade actions when a version bump is detected between the installed plugin and the version stored in .preflight-state.json.",
   "changelog": {
+    "1.4.2": {
+      "summary": "lean-ctx tool preference instructions — preflight now generates a tool substitution table in copilot-instructions.md when lean-ctx is configured, teaching Copilot to prefer ctx_read, ctx_shell, ctx_tree, and ctx_search over native tools.",
+      "configImpacts": [
+        {
+          "type": "improvement",
+          "description": "copilot-instructions.md generation now includes a lean-ctx tool preference section (point 8 in the structure) when leanCtxConfigured or leanCtxInstalled is true. The section provides a tool substitution table (view→ctx_read, glob→ctx_tree, grep→ctx_search, powershell→ctx_shell) with conditional fallback wording, making it safe for team repos where not all developers have lean-ctx installed.",
+          "affectedFiles": [".github/copilot-instructions.md"],
+          "recommendation": "Re-run @preflight and regenerate copilot-instructions.md — the updated file will include lean-ctx tool preference instructions so Copilot actually uses the lean-ctx tools, not just has them available."
+        }
+      ]
+    },
     "1.4.1": {
       "summary": "Improved lean-ctx setup — expanded detection to include .vscode/mcp.json, shell hook guidance via lean-ctx setup, OS-aware install instructions (npm-first for Windows), and lean-ctx doctor verification step.",
       "configImpacts": [
