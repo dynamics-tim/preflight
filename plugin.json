@@ -1,7 +1,7 @@
 {
   "name": "preflight",
   "description": "Scans any codebase and scaffolds an optimized GitHub Copilot configuration interactively.",
-  "version": "1.2.4",
+  "version": "1.4.0",
   "author": {
     "name": "dynamics-tim"
   },
@@ -10,5 +10,5 @@
   "repository": "https://github.com/dynamics-tim/preflight",
   "keywords": ["copilot", "setup", "scaffolding", "instructions", "agents", "configuration"],
   "agents": "agents/",
-  "skills": ["skills/preflight-scan/", "skills/preflight-deep-scan/", "skills/skill-extractor/", "skills/preflight-authoring/"]
+  "skills": ["skills/preflight-scan/", "skills/preflight-deep-scan/", "skills/skill-extractor/", "skills/preflight-authoring/", "skills/preflight-hooks/"]
 }

@@ -9,10 +9,6 @@ description: |
   "create hook", "add hook config", "configure hook event", "guardrails hook",
   "create instruction file", "add path instruction", "new instructions.md",
   "update instruction", "applyTo pattern".
-allowed-tools:
-  - read
-  - edit
-  - search
 ---
 
 # Preflight Authoring

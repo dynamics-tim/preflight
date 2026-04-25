@@ -1,5 +1,5 @@
 ---
-applyTo: "agents/**/*.md"
+applyTo: "agents/**/*.md, .github/agents/**/*.md"
 ---
 
 <!-- managed-by: preflight -->
@@ -22,6 +22,8 @@ tools:
 
 - `tools` should be the minimal set needed — don't request tools the agent won't use.
 - Common tools: `read`, `edit`, `search`, `execute`, `ask_user`, `web`.
+- **Omit `tools` entirely** for general-purpose agents that need access to all built-in tools AND globally configured MCP servers. An explicit `tools` list acts as a strict allowlist and blocks MCP tools not referenced via `mcp-servers`.
+- Use `mcp-servers` frontmatter property to attach specific MCP servers to a narrowly-scoped agent instead of removing the tools restriction entirely.
 
 ## Content Structure
 

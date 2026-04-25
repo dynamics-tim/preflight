@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "_comment": "Config freshness checker. Runs at session start to remind the user to re-run @preflight if the config is stale (default: 30 days). Reads .github/.preflight-state.json for lastRun timestamp and optional reminderDaysThreshold.",
+  "hooks": {
+    "sessionStart": [
+      {
+        "type": "command",
+        "bash": "if [ -f .github/.preflight-state.json ]; then python3 -c \"import json,sys,datetime;s=json.load(open('.github/.preflight-state.json'));lr=datetime.datetime.fromisoformat(s['lastRun'].replace('Z','+00:00'));th=int(s.get('reminderDaysThreshold',30));d=(datetime.datetime.now(datetime.timezone.utc)-lr).days;print('[preflight] Config is '+str(d)+' days old - run @preflight to update.',file=sys.stderr) if d>=th else None\" 2>&1 >&2 || node -e \"try{var s=JSON.parse(require('fs').readFileSync('.github/.preflight-state.json','utf8'));var d=Math.floor((Date.now()-new Date(s.lastRun))/86400000);var t=parseInt(s.reminderDaysThreshold||30);if(d>=t)process.stderr.write('[preflight] Config is '+d+' days old - run @preflight to update.\\n')}catch(e){}\" 2>/dev/null || true; else echo '[preflight] No Copilot config found — run @preflight to set up this project.' >&2; fi || true",
+        "powershell": "try { if (Test-Path .github/.preflight-state.json) { $s = Get-Content .github/.preflight-state.json -Raw | ConvertFrom-Json; $lastRun = [datetime]::Parse($s.lastRun).ToUniversalTime(); $threshold = if ($s.reminderDaysThreshold) { [int]$s.reminderDaysThreshold } else { 30 }; $days = ((Get-Date).ToUniversalTime() - $lastRun).Days; if ($days -ge $threshold) { Write-Host \"[preflight] Config is $days days old — run @preflight to update.\" } } else { Write-Host '[preflight] No Copilot config found — run @preflight to set up this project.' } } catch {}",
+        "timeoutSec": 5
+      }
+    ]
+  }
+}

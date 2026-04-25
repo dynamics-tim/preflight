@@ -5,9 +5,6 @@ description: |
   and architectural patterns for preflight. Use when setting up Copilot
   configuration and the user wants a deeper analysis beyond manifest-level detection.
   Triggers: "deep scan", "analyze patterns", "code conventions", "deeper analysis".
-allowed-tools:
-  - read
-  - search
 ---
 
 # Deep Scan — Code Pattern Analysis

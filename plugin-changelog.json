@@ -1,6 +1,40 @@
 {
   "_comment": "Maps each plugin release to config improvements. Used by the preflight agent to surface targeted upgrade actions when a version bump is detected between the installed plugin and the version stored in .preflight-state.json.",
   "changelog": {
+    "1.4.0": {
+      "summary": "lean-ctx MCP server recommendation — preflight now detects whether lean-ctx is configured and offers to add it to the developer's personal MCP config, reducing Copilot token costs by 60–99% per session.",
+      "configImpacts": [
+        {
+          "type": "new_feature",
+          "description": "lean-ctx token cost reduction (Category 7) — preflight now detects lean-ctx in ~/.copilot/mcp-config.json and .mcp.json. If absent, it offers to add the entry or show manual instructions. lean-ctx compresses file reads, shell output, and tool responses before they reach the LLM.",
+          "affectedFiles": [],
+          "recommendation": "Re-run @preflight and review Category 7 to add lean-ctx to your personal MCP config."
+        }
+      ]
+    },
+    "1.3.0": {
+      "summary": "Community skill discovery, copilot init awareness, native command education, and agent slimming. Surfaces github/awesome-copilot skills matched to your stack, detects copilot-init-generated instruction files, adds native command hints after each category, and moves hook templates to the preflight-hooks skill.",
+      "configImpacts": [
+        {
+          "type": "new_feature",
+          "description": "Community skill discovery (Phase 2, step 2.5) — preflight now matches your detected stack against github/awesome-copilot skills and presents a multi-select of recommended skills with gh skill install commands.",
+          "affectedFiles": [],
+          "recommendation": "Re-run @preflight to see community skill recommendations matched to your stack."
+        },
+        {
+          "type": "improvement",
+          "description": "Session learning (Category 5) now leads with the zero-setup path: @skill-extractor works immediately from the session store with no hook required. The session-logger hook is now presented as optional enrichment, not a prerequisite.",
+          "affectedFiles": [".github/hooks/session-logger.json"],
+          "recommendation": "Try @skill-extractor without installing the hook — the session store is always available. Install the hook only if you want richer per-command data."
+        },
+        {
+          "type": "improvement",
+          "description": "Hook templates (session-logger and config-freshness) are now maintained in the preflight-hooks skill rather than inlined in the agent — making them easier to update and reducing agent context size.",
+          "affectedFiles": [".github/hooks/session-logger.json", ".github/hooks/config-freshness.json"],
+          "recommendation": "No action needed. Reinstall hooks via @preflight if you want the latest template."
+        }
+      ]
+    },
     "1.2.4": {
       "summary": "Simplified session-logger hook — postToolUse now captures only phase boundaries (report_intent) and shell commands (powershell), reducing invocations by ~80% while preserving the two highest-signal data points for skill extraction. Removed dead log-tool-call helper scripts that referenced a non-existent env-var hook interface.",
       "configImpacts": [

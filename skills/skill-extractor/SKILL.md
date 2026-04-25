@@ -5,12 +5,6 @@ description: |
   and cleanup. Use when: "extract skill", "create skill from session",
   "review last session", "save as skill", "evaluate skills", "improve skills",
   "audit skills", "clean up skills", "review skill quality", "stale skills".
-allowed-tools:
-  - read
-  - edit
-  - search
-  - execute
-  - sql
 ---
 
 # Skill Extractor — Session Pattern Knowledge

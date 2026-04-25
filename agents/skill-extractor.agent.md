@@ -6,8 +6,7 @@ tools:
   - edit
   - search
   - execute
-  - ask_user
-  - sql
+  - vscode/askQuestions
 ---
 
 # Skill Extractor Agent

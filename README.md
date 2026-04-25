@@ -14,6 +14,7 @@
 |---|---|
 | GitHub Copilot CLI | Host — preflight runs as a Copilot plugin |
 | Node.js 18+ | Copilot CLI runtime |
+| `gh` CLI _(optional)_ | Enables `gh skill install` for community skill discovery |
 
 That's it. No Python, no PAC CLI, no cloud services. Preflight is pure Copilot-native.
 
@@ -50,8 +51,8 @@ cp /tmp/preflight/agents/preflight.agent.md YOUR_PROJECT/.github/agents/
 Preflight runs four phases automatically:
 
 1. **Scans** your codebase — detects tech stack, frameworks, folder structure, existing Copilot config
-2. **Reports** findings with evidence — framework versions, config files, dependencies
-3. **Recommends** a tailored setup — instructions, path-specific rules, custom agents, hooks — you confirm each
+2. **Reports** findings and matches your stack to community skills from `github/awesome-copilot` — you pick which to install
+3. **Recommends** a tailored setup — instructions, path-specific rules, custom agents, hooks — you confirm each with native command hints included
 4. **Scaffolds** all confirmed files — validates each after creation, safe to re-run
 
 ### Presets
@@ -92,8 +93,12 @@ You should see some or all of these (depending on what you confirmed):
 |---------|-------------|-------------|
 | `@preflight` | Re-scan and update your Copilot config | When your stack changes, you add frameworks, or config becomes stale |
 | `@preflight` (audit) | Validate existing config, detect stack drift, suggest improvements | When you already have config and want to check it |
-| `@skill-extractor` | Extract repeatable patterns from sessions into skills | After 3–5 normal coding sessions with the session-logger hook active |
+| `@skill-extractor` | Extract repeatable patterns from sessions into skills | After a few normal coding sessions — works from session store, no hook needed |
 | `@code-reviewer` | Review code for bugs and security issues | Before pushing changes (if you created this agent during setup) |
+| `/instructions` | Verify active instruction files | Check what's loaded, diagnose unexpected suggestions |
+| `/agent` | Browse installed agents | Find agents by name or description |
+| `/skills list` | See active skills | Verify installed skills loaded correctly |
+| `gh skill install <path>` | Install a community skill | Add skills from `github/awesome-copilot` |
 
 > **How invocation works:** Agents are invoked with `@name` in Copilot chat. Instructions and skills load automatically — no manual invocation needed. The config freshness hook runs silently at session start and reminds you when it's time to re-run.
 
@@ -132,30 +137,26 @@ You should see some or all of these (depending on what you confirmed):
 
 ## Session Learning
 
-The **skill-extractor** manages the full skill lifecycle: extract repeatable patterns from sessions, evaluate existing skills against session activity patterns, improve underperforming skills, and clean up stale ones.
-
-The session-logger hook captures rich context — file paths, tool arguments, and timing — not just tool names. This enables the skill extractor to detect nuanced patterns like "read test file → edit source → re-run tests" across sessions.
+The session store already captures your complete Copilot session history automatically — `@skill-extractor` can analyze it immediately with no setup. The session-logger hook is optional enrichment that adds per-command detail for power users.
 
 ### How it works
 
-1. **Hooks log tool calls** — A `postToolUse` hook appends each tool call (with file paths and args) to `.copilot/session-activity.jsonl`
-2. **Agent analyzes patterns** — The `@skill-extractor` agent reads the log and identifies repeated multi-step workflows
-3. **You confirm & save** — Detected patterns are presented for approval, then generated as `.github/skills/` definitions
-4. **Evaluate & improve** — Existing skills are checked against session activity patterns for trigger accuracy, workflow drift, and file pattern staleness
-5. **Clean up** — Unused or stale skills are archived to keep your configuration lean
+1. **Session store always available** — `@skill-extractor` reads session history directly from the built-in SQL store
+2. **Hook adds richer data** — An optional `postToolUse` hook appends tool call details to `.copilot/session-activity.jsonl`
+3. **Agent analyzes patterns** — `@skill-extractor` identifies repeated multi-step workflows across sessions
+4. **You confirm & save** — Detected patterns are presented for approval, then generated as `.github/skills/` definitions
+5. **Evaluate & improve** — Existing skills are checked against session activity patterns for trigger accuracy, workflow drift, and file pattern staleness
+6. **Clean up** — Unused or stale skills are archived to keep your configuration lean
 
 ### Quick setup
 
 ```bash
-# 1. Run preflight and accept the session-logger hook
+# 1. Run preflight (session-logger hook is optional — @skill-extractor works without it)
 @preflight
 
-# 2. Add .copilot/ to .gitignore (session logs are ephemeral)
-echo '.copilot/' >> .gitignore
+# 2. Work normally for a few sessions
 
-# 3. Work normally for 3–5 sessions (10+ tool calls each)
-
-# 4. Extract patterns
+# 3. Extract patterns
 @skill-extractor review last session
 ```
 
@@ -167,7 +168,7 @@ echo '.copilot/' >> .gitignore
 @skill-extractor clean up skills
 ```
 
-> **Minimum data needed:** The skill extractor needs at least 3 sessions with 10+ tool calls each to detect reliable patterns. Quick Q&A sessions don't generate enough data — use it after real coding sessions involving file reads, edits, and test runs.
+> **Note:** The session store is always available — no hook needed to start. Install the session-logger hook if you want richer per-command data (tool args, shell command text). Either way, `@skill-extractor` works immediately.
 
 See `skills/skill-extractor/SKILL.md` for the full workflow and pattern detection heuristics.
 
@@ -200,11 +201,13 @@ preflight/
 │   ├── preflight.agent.md          # The core agent (entire workflow)
 │   └── skill-extractor.agent.md    # Extracts reusable skills from session patterns
 ├── skills/
-│   ├── preflight-scan/             # Optional scan helper
+│   ├── preflight-scan/             # Optional scan helper + community skill mapping
 │   │   ├── SKILL.md
 │   │   ├── scan.sh                 # Unix fast-scan helper
 │   │   └── scan.ps1                # Windows fast-scan helper
 │   ├── preflight-deep-scan/        # On-demand deep code analysis
+│   │   └── SKILL.md
+│   ├── preflight-hooks/            # Hook templates (session-logger, config-freshness)
 │   │   └── SKILL.md
 │   ├── skill-extractor/            # Session pattern analysis & skill generation
 │   │   ├── SKILL.md
@@ -238,7 +241,7 @@ preflight/
 
 ## Roadmap
 
-- **v1 (current):** Agent + scan + plugin install + presets + audit mode + session logging + evidence-based recommendations.
+- **v1 (current):** Agent + scan + community skill discovery + plugin install + presets + audit mode + session learning + native command education.
 - **v2 (planned):** MCP config scaffolding, team-sharing workflows.
 - **v3:** Stack affinity mapping, marketplace integration.
 
