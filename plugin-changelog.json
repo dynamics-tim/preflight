@@ -1,6 +1,23 @@
 {
   "_comment": "Maps each plugin release to config improvements. Used by the preflight agent to surface targeted upgrade actions when a version bump is detected between the installed plugin and the version stored in .preflight-state.json.",
   "changelog": {
+    "1.4.1": {
+      "summary": "Improved lean-ctx setup — expanded detection to include .vscode/mcp.json, shell hook guidance via lean-ctx setup, OS-aware install instructions (npm-first for Windows), and lean-ctx doctor verification step.",
+      "configImpacts": [
+        {
+          "type": "improvement",
+          "description": "lean-ctx detection (Step 1k) now also checks .vscode/mcp.json — users with VS Code workspace MCP configs are no longer incorrectly prompted to set up lean-ctx when it is already configured.",
+          "affectedFiles": [],
+          "recommendation": "No action needed. Detection improvement is automatic on next @preflight run."
+        },
+        {
+          "type": "improvement",
+          "description": "lean-ctx setup (Category 7) now explains and enables the shell hook layer (60-95% CLI savings on git, npm, docker, gh, and 19 more commands) by guiding the user to run lean-ctx setup after the MCP config is added. Install options now show npm first (works on Windows without WSL). lean-ctx doctor verification is prompted after setup.",
+          "affectedFiles": [],
+          "recommendation": "If lean-ctx is installed but you haven't run lean-ctx setup, do so now to enable transparent shell compression alongside the MCP layer."
+        }
+      ]
+    },
     "1.4.0": {
       "summary": "lean-ctx MCP server recommendation — preflight now detects whether lean-ctx is configured and offers to add it to the developer's personal MCP config, reducing Copilot token costs by 60–99% per session.",
       "configImpacts": [

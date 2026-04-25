@@ -198,22 +198,23 @@ Execute `gh --version` (Bash) or `Get-Command gh -ErrorAction SilentlyContinue` 
 
 #### 1k. Detect lean-ctx MCP configuration
 
-Silently check for an existing lean-ctx MCP server. Search in two locations:
+Silently check for an existing lean-ctx MCP server. Search in three locations:
 
 1. **Personal config** — `~/.copilot/mcp-config.json` (Unix) or `%USERPROFILE%\.copilot\mcp-config.json` (Windows)
 2. **Project config** — `.mcp.json` at the repo root (already discovered in step 1f if present)
+3. **VS Code workspace config** — `.vscode/mcp.json` (already discovered in step 1f if present)
 
 For each file that exists, read it and parse as JSON. Inspect `mcpServers` for any entry where:
 - the server key equals `lean-ctx`, **or**
 - the `command` value contains the string `lean-ctx`
 
 Store:
-- `leanCtxConfigured` (bool) — true if a matching entry is found in either location
-- `leanCtxConfigSource` (string or null) — `"personal"` or `"project"` (whichever was found first), or null if not found
+- `leanCtxConfigured` (bool) — true if a matching entry is found in any location
+- `leanCtxConfigSource` (string or null) — `"personal"`, `"project"`, or `"vscode"` (whichever was found first), or null if not found
 
 On any read or parse error, set `leanCtxConfigured = false` and proceed silently. Never surface this check to the user.
 
-The current installed version of preflight is **CURRENT_PLUGIN_VERSION = "1.4.0"**.
+The current installed version of preflight is **CURRENT_PLUGIN_VERSION = "1.4.1"**.
 
 Silently perform two checks:
 
@@ -755,18 +756,18 @@ Add the hook file to the `managedFiles` array in `.preflight-state.json`. Also s
 
 ```json
 {
-  "message": "💡 **lean-ctx — reduce Copilot token costs** (`~/.copilot/mcp-config.json`)\n\nYou just set up instructions, agents, and hooks that shape how Copilot reasons about your project. lean-ctx works at the transport layer: it compresses file reads, shell output, and tool responses before they reach the LLM — reducing token consumption by 60–99% per session.\n\n**Without it:** Every file read and shell command sends full, uncompressed output to the LLM.\n**With it:** The same operations send compressed, cached context — up to 99% fewer tokens on repeated reads.\n\nThis is a **per-developer setting** (`~/.copilot/mcp-config.json`) — it affects your machine only and is not committed to the repo.",
+  "message": "💡 **lean-ctx — reduce Copilot token costs** (`~/.copilot/mcp-config.json`)\n\nYou just set up instructions, agents, and hooks that shape how Copilot reasons about your project. lean-ctx works at two layers:\n\n**MCP layer (74–99% savings):** replaces raw file reads and tool responses with compressed, cached equivalents — repeated file reads drop from ~2,000 tokens to ~13 tokens.\n\n**Shell hook layer (60–95% savings):** after running `lean-ctx setup`, 23 CLI commands (git, npm, docker, gh, pip, …) are transparently compressed before their output reaches the LLM — no workflow changes needed.\n\n**Without it:** Every file read and shell command sends full, uncompressed output to the LLM.\n**With it:** A typical session saves 60–99% of context tokens — faster responses and lower API costs.\n\nThis is a **per-developer setting** — it affects your machine only and is not committed to the repo.",
   "requestedSchema": {
     "properties": {
       "action": {
         "type": "string",
         "title": "How would you like to proceed?",
         "oneOf": [
-          { "const": "install", "title": "Add to my Copilot MCP config — edit ~/.copilot/mcp-config.json now" },
-          { "const": "instructions", "title": "Show me the instructions — I'll add it myself" },
+          { "const": "install", "title": "Set it up now — add to ~/.copilot/mcp-config.json and guide me through lean-ctx setup" },
+          { "const": "instructions", "title": "Show me the steps — I'll add it myself" },
           { "const": "skip", "title": "Skip — I'll set this up later" }
         ],
-        "default": "instructions"
+        "default": "install"
       }
     },
     "required": ["action"]
@@ -781,14 +782,17 @@ First check if the lean-ctx binary is available: execute `lean-ctx --version` (B
 ```
 lean-ctx is not installed yet. Install it first:
 
-  # Universal (no Rust needed)
-  curl -fsSL https://leanctx.com/install.sh | sh
-
-  # Node.js
+  # Node.js (works on Windows, macOS, and Linux)
   npm install -g lean-ctx-bin
 
-  # Cargo
+  # Universal installer (Unix / WSL / Git Bash)
+  curl -fsSL https://leanctx.com/install.sh | sh
+
+  # Rust / Cargo
   cargo install lean-ctx
+
+  # macOS / Linux via Homebrew
+  brew tap yvgude/lean-ctx && brew install lean-ctx
 
 Then re-run @preflight — or proceed below to add the MCP config now so it's ready when lean-ctx is installed.
 ```
@@ -814,7 +818,35 @@ The entry to add under `mcpServers`:
 }
 ```
 
-After writing the file, tell the user: "Entry added. **Reload Copilot** (restart VS Code or run `Developer: Reload Window`) to activate lean-ctx."
+After writing the file, tell the user: "MCP entry added to `~/.copilot/mcp-config.json`. **Reload Copilot** (restart VS Code or run `Developer: Reload Window`) to activate the MCP layer."
+
+**Shell hook setup offer** — if the lean-ctx binary IS available (found in the binary check above), use `ask_user` to offer shell hook integration:
+
+```json
+{
+  "message": "🐚 **Enable shell hook compression (60–95% CLI savings)**\n\nlean-ctx can also transparently compress the output of 23 CLI commands — git, npm, docker, gh, pip, and more — before it reaches the LLM. This is separate from the MCP layer and requires running one setup command:\n\n```\nlean-ctx setup\n```\n\nThis is safe and idempotent — it adds shell aliases to your profile (`~/.zshrc`, `~/.bashrc`, or PowerShell profile) and auto-detects any other editors (Cursor, Claude Code, Windsurf, etc.) to configure. Run `lean-ctx-off` at any time to disable for the current session.",
+  "requestedSchema": {
+    "properties": {
+      "runSetup": {
+        "type": "boolean",
+        "title": "Run lean-ctx setup now to enable shell hook compression",
+        "description": "Adds shell aliases for 23 commands and auto-configures any other detected editors",
+        "default": true
+      }
+    },
+    "required": ["runSetup"]
+  }
+}
+```
+
+- If the user accepts: execute `lean-ctx setup` and show the output. Then tell the user: "Shell hooks are active. Restart your terminal (or run `source ~/.zshrc` / `. $PROFILE`) for the aliases to take effect in this session."
+- If the user declines: note that they can run `lean-ctx setup` manually at any time.
+
+**Verification step:** After completing the above, tell the user:
+
+```
+Run `lean-ctx doctor` to verify your setup is complete and both layers are active.
+```
 
 Store `leanCtxInstalled = true` for the Phase 4d summary.
 
@@ -823,24 +855,45 @@ Store `leanCtxInstalled = true` for the Phase 4d summary.
 Show the manual steps:
 
 ```
-## Adding lean-ctx manually
+## Setting up lean-ctx manually
 
-1. Install lean-ctx (if not already):
-   curl -fsSL https://leanctx.com/install.sh | sh   # or: npm install -g lean-ctx-bin
+### 1. Install lean-ctx (pick one):
 
-2. Add to ~/.copilot/mcp-config.json (create if it doesn't exist):
-   {
-     "mcpServers": {
-       "lean-ctx": {
-         "command": "lean-ctx",
-         "args": []
-       }
-     }
-   }
+  # Node.js — works on Windows, macOS, and Linux
+  npm install -g lean-ctx-bin
 
-3. Reload Copilot (restart VS Code or Developer: Reload Window).
+  # Universal installer — Unix / WSL / Git Bash
+  curl -fsSL https://leanctx.com/install.sh | sh
 
-4. Verify: lean-ctx doctor
+  # Rust / Cargo
+  cargo install lean-ctx
+
+  # macOS / Linux via Homebrew
+  brew tap yvgude/lean-ctx && brew install lean-ctx
+
+### 2. Configure all editors + shell hooks (recommended):
+
+  lean-ctx setup
+
+  This auto-detects your editors (VS Code/Copilot, Cursor, Claude Code, etc.)
+  and adds shell compression aliases for git, npm, docker, gh, and 19 more commands.
+
+### 3. Add to ~/.copilot/mcp-config.json (create if it doesn't exist):
+
+  {
+    "mcpServers": {
+      "lean-ctx": {
+        "command": "lean-ctx",
+        "args": []
+      }
+    }
+  }
+
+### 4. Reload Copilot (restart VS Code or Developer: Reload Window).
+
+### 5. Verify:
+
+  lean-ctx doctor
 ```
 
 Store `leanCtxInstalled = false`.
@@ -905,7 +958,7 @@ After all files are created, create or update `.github/.preflight-state.json`:
 ```json
 {
   "version": "1.0.0",
-  "pluginVersion": "1.4.0",
+  "pluginVersion": "1.4.1",
   "lastRun": "<ISO 8601 timestamp>",
   "detectedStack": {
     "languages": ["typescript"],
@@ -922,7 +975,7 @@ After all files are created, create or update `.github/.preflight-state.json`:
 }
 ```
 
-- `pluginVersion` — always set to `CURRENT_PLUGIN_VERSION` ("1.4.0"). This is what future runs compare against to detect version drift and surface config improvements from newer plugin releases.
+- `pluginVersion` — always set to `CURRENT_PLUGIN_VERSION` ("1.4.1"). This is what future runs compare against to detect version drift and surface config improvements from newer plugin releases.
 
 If `.preflight-state.json` already exists, update it (merge `managedFiles`, update `lastRun`, `detectedStack`, and `pluginVersion`).
 
