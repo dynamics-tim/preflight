@@ -81,8 +81,8 @@ You should see some or all of these (depending on what you confirmed):
 | `.github/instructions/*.instructions.md` | Language/path-specific rules |
 | `.github/agents/*.agent.md` | Custom agent profiles |
 | `.github/.preflight-state.json` | State tracking for idempotent re-runs |
-| `.github/hooks/config-freshness.json` | Reminds you when config is stale |
-| `.github/hooks/session-logger.json` | Captures tool usage for skill extraction |
+| `.github/extensions/config-freshness/extension.mjs` | Reminds you when config is stale |
+| `.github/extensions/session-logger/extension.mjs` | Captures tool usage for skill extraction |
 
 ---
 
@@ -92,10 +92,10 @@ You should see some or all of these (depending on what you confirmed):
 |---------|-------------|-------------|
 | `@preflight` | Re-scan and update your Copilot config | When your stack changes, you add frameworks, or config becomes stale |
 | `@preflight` (audit) | Validate existing config, detect stack drift, suggest improvements | When you already have config and want to check it |
-| `@skill-extractor` | Extract repeatable patterns from sessions into skills | After 3–5 normal coding sessions with the session-logger hook active |
+| `@skill-extractor` | Extract repeatable patterns from sessions into skills | After 3–5 normal coding sessions with the session-logger extension active |
 | `@code-reviewer` | Review code for bugs and security issues | Before pushing changes (if you created this agent during setup) |
 
-> **How invocation works:** Agents are invoked with `@name` in Copilot chat. Instructions and skills load automatically — no manual invocation needed. The config freshness hook runs silently at session start and reminds you when it's time to re-run.
+> **How invocation works:** Agents are invoked with `@name` in Copilot chat. Instructions and skills load automatically — no manual invocation needed. The config-freshness extension runs silently at session start and reminds you when it's time to re-run.
 
 ---
 

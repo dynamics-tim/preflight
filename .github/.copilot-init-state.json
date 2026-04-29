@@ -17,6 +17,6 @@
     ".github/instructions/hooks.instructions.md",
     ".github/agents/docs-writer.agent.md",
     ".github/agents/code-reviewer.agent.md",
-    ".github/hooks/session-logger.json"
+    ".github/extensions/session-logger/extension.mjs"
   ]
 }

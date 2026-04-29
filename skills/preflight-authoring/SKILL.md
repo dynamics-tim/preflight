@@ -75,66 +75,57 @@ the cross-file coordination that instruction files cannot express.
 
 ---
 
-## Hook Config Authoring
+## Extension Authoring
 
-Creates and maintains `.github/hooks/*.json` config files. Hooks fire
-automatically on Copilot events and must be fast, cross-platform, and safe.
+Creates and maintains `.github/extensions/<name>/extension.mjs` files. Extensions run as SDK
+processes that communicate with the CLI over JSON-RPC — they fire hooks at session lifecycle
+points and can register custom tools.
 
-Structural rules (version field, event names, dual-platform commands) are covered
-by `.github/instructions/hooks.instructions.md`. This section adds task-level
-guidance: choosing the right reference hook, selecting events, and designing
-commands that meet performance constraints.
+Structural rules (imports, hook names, error handling, logging) are covered by
+`.github/instructions/hooks.instructions.md`. This section adds task-level guidance: choosing
+the right hook events, designing fast hook bodies, and following the established extension patterns.
 
-### Hook Workflow
+### Extension Workflow
 
-1. **Clarify the hook's goal** — Determine which category it falls into:
-   - **Logging** — Append data to a file on `postToolUse` or `sessionEnd`
-   - **Guardrails** — Block or warn on dangerous operations via `preToolUse` gates
-   - **Freshness** — Check config age or drift on `sessionStart`
+1. **Clarify the extension's goal** — Determine which category it falls into:
+   - **Logging** — Append tool call data to a file on `onPostToolUse` or `onSessionEnd`
+   - **Guardrails** — Block or warn on dangerous operations via `onPreToolUse`
+   - **Freshness** — Check config age or drift on `onSessionStart`
    - **Custom** — Other automation on any supported event
 
-2. **Choose a hook pattern** — Determine which category best fits:
-   - `session-logger` style — For logging hooks (postToolUse, sessionStart/End)
-   - `guardrails` style — For preToolUse deny rules (reads stdin, outputs permissionDecision JSON)
-   - `config-freshness` style — For sessionStart checks
-
-3. **Select events** — Use only the events you need:
+2. **Choose hook events** — Use only the events you need:
 
    | Event | Fires when | Typical use |
    |---|---|---|
-   | `sessionStart` | Session begins | Load state, check freshness, rotate logs |
-   | `sessionEnd` | Session ends | Persist state, trigger analysis |
-   | `preToolUse` | Before a tool runs | Gates: reject or warn on dangerous ops |
-   | `postToolUse` | After a tool runs | Logging, metrics, side effects |
-   | `userPromptSubmitted` | User sends a message | Prompt augmentation |
-   | `errorOccurred` | An error happens | Error logging, recovery |
+   | `onSessionStart` | Session begins | Load state, check freshness, rotate logs |
+   | `onSessionEnd` | Session ends | Persist state, trigger analysis |
+   | `onPreToolUse` | Before a tool runs | Gates: return `{ permissionDecision: "deny" }` to block |
+   | `onPostToolUse` | After a tool runs | Logging, metrics, side effects |
+   | `onUserPromptSubmitted` | User sends a message | Prompt augmentation via `additionalContext` |
+   | `onErrorOccurred` | An error occurs | Error logging, recovery |
 
-4. **Design commands for performance** — Hooks fire frequently. Commands must:
-   - Complete in under 100ms (prefer simple appends over read-modify-write)
-   - Use `|| true` (Bash) or `try {} catch {}` (PowerShell) for non-critical ops
-   - Include `timeoutSec: 5` as the default safety net
-   - Write to `.copilot/` for ephemeral data (added to `.gitignore`)
+3. **Design for performance** — `onPostToolUse` fires on every tool call. Commands must:
+   - Complete in milliseconds (prefer simple `appendFileSync` over read-modify-write)
+   - Wrap all logic in `try { } catch { }` — errors terminate the extension process
+   - Write to `.copilot/` for ephemeral data (add to `.gitignore`)
 
-5. **Write both platform commands** — Every step needs `bash` and
-   `powershell` fields producing identical behavior. For `preToolUse` deny rules,
-   read stdin JSON and output `{"permissionDecision":"deny","permissionDecisionReason":"..."}` to block.
+4. **Use the SDK for output** — Always use `session.log()` to surface messages, not `console.log()`.
 
-6. **Add a `_comment` field** — Document the hook's purpose at the top level
-   for human readers browsing the JSON.
+5. **Reference existing extensions** — Read `session-logger/extension.mjs` and `config-freshness/extension.mjs` in `.github/extensions/` as canonical patterns.
 
-### Hook File Patterns
+### Extension File Patterns
 
-- `.github/hooks/*.json` — Active hook configurations
+- `.github/extensions/*/extension.mjs` — Active SDK extensions
 
-### Hook Rules
+### Extension Rules
 
-- Always start with `"version": 1` at the top level
-- All hook steps use `type: "command"` with both `bash` and `powershell` fields — there is no "gate" type
-- Command hooks must include both `bash` and `powershell` fields — never one without the other
-- Prefer JSONL format (one JSON object per line) for any log files hooks create
-- Hooks receive context via JSON on stdin — read with `INPUT=$(cat)` in bash or `[Console]::In.ReadToEnd()` in PowerShell. Parse `toolName`, `toolArgs`, etc. with `jq`/`ConvertFrom-Json`
-- Don't put complex logic in hook commands — if it needs more than ~3 lines, extract to a helper script
-- Test hooks on both platforms before committing
+- Always import from `@github/copilot-sdk/extension` — never install the SDK manually
+- The entry file must be named `extension.mjs` (`.mjs` required, not `.js`)
+- Use `const session = await joinSession({ hooks: {...}, tools: [] })` as the top-level structure
+- Wrap every hook body in `try { } catch { }` — unhandled errors kill the extension
+- Use `session.log(msg, { level: "warning" })` not `console.warn()` for user-visible messages
+- Node.js built-ins (`node:fs`, `node:path`) are available — no `package.json` needed
+- Don't put complex logic inline — extract helpers to sibling files alongside `extension.mjs`
 
 ---
 

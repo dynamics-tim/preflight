@@ -399,114 +399,122 @@ File: `~/.copilot/mcp-config.json`
 
 ---
 
-## 5. Hooks
+## 5. Hooks (Extensions)
 
 ### What it is
 
-Hooks are **shell commands that execute at specific lifecycle points** during a Copilot agent session. They let you inject custom logic — guardrails, logging, policy enforcement, telemetry — into Copilot's workflow without modifying Copilot itself.
+Hooks are **Node.js callbacks that execute at specific lifecycle points** during a Copilot agent session. They let you inject custom logic — guardrails, logging, policy enforcement, telemetry — into Copilot's workflow without modifying Copilot itself.
 
 ### Location
 
-Hooks are defined in JSON files at: `.github/hooks/*.json`
+Hooks are registered inside **SDK extensions** at: `.github/extensions/<name>/extension.mjs`
+
+Each extension is a separate subdirectory with an `extension.mjs` entry point. The `@github/copilot-sdk` import is resolved automatically by the CLI — no `npm install` needed.
 
 ### Available Hooks
 
 | Hook | When It Fires |
 |------|---------------|
-| `sessionStart` | A new Copilot session begins |
-| `sessionEnd` | The session ends (user quits or session times out) |
-| `userPromptSubmitted` | The user submits a prompt |
-| `preToolUse` | Before a tool runs (can block execution) |
-| `postToolUse` | After a tool completes |
-| `errorOccurred` | When an error occurs during processing |
-| `agentStop` | The main agent stops |
-| `subagentStop` | A subagent completes its work |
+| `onSessionStart` | A new Copilot session begins |
+| `onSessionEnd` | The session ends |
+| `onUserPromptSubmitted` | The user submits a prompt |
+| `onPreToolUse` | Before a tool runs (can block execution) |
+| `onPostToolUse` | After a tool completes |
+| `onErrorOccurred` | When an error occurs during processing |
 
-### Hook Configuration Structure
+### Extension Structure
 
-```json
-{
-  "version": 1,
-  "hooks": {
-    "hookName": [
-      {
-        "type": "command",
-        "bash": "echo 'hook fired'",
-        "powershell": "Write-Output 'hook fired'",
-        "cwd": "${workspaceFolder}",
-        "timeoutSec": 30,
-        "env": {
-          "CUSTOM_VAR": "value"
-        }
-      }
-    ]
-  }
-}
+```js
+import { joinSession } from "@github/copilot-sdk/extension";
+
+const session = await joinSession({
+    hooks: {
+        onSessionStart: async (input) => {
+            // input.source: "startup" | "resume" | "new"
+            await session.log("Session started", { level: "info" });
+        },
+        onPreToolUse: async (input) => {
+            // Block dangerous tool calls
+            if (input.toolName === "bash" && /rm -rf/.test(input.toolArgs?.command ?? "")) {
+                return { permissionDecision: "deny", permissionDecisionReason: "Destructive commands are blocked." };
+            }
+        },
+        onPostToolUse: async (input) => {
+            // input.toolName, input.toolArgs, input.toolResult
+        },
+        onSessionEnd: async (input) => {
+            // input.reason: "complete" | "error" | "abort" | "timeout" | "user_exit"
+        },
+    },
+    tools: [],
+});
 ```
 
 ### Key Points
 
-- **`preToolUse` can block tool execution** — output a JSON object with `"permissionDecision": "deny"` to cancel the tool call. This is your primary guardrail mechanism.
-- **Default timeout is 30 seconds.** Adjust with `timeoutSec` for longer-running hooks.
-- Hooks receive **context via JSON on stdin** — tool name, arguments, results, etc. Read with `INPUT=$(cat)` in bash or `[Console]::In.ReadToEnd()` in PowerShell.
-- You can define **both `bash` and `powershell`** commands; the correct one runs based on the OS.
-- Hooks can reference **external scripts** for complex logic.
-- Multiple hook files in `.github/hooks/` are all loaded and merged.
+- **`onPreToolUse` can block tool execution** — return `{ permissionDecision: "deny" }` to cancel the tool call. This is your primary guardrail mechanism.
+- **`session.log(msg, { level })` surfaces messages in the CLI timeline** — levels: `"info"`, `"warning"`, `"error"`. Use `{ ephemeral: true }` for transient messages.
+- Extensions run as separate Node.js processes and communicate with the CLI over JSON-RPC via stdio.
+- Node.js built-in modules (`node:fs`, `node:path`, `node:child_process`) are available — no package.json needed.
+- Multiple extensions in `.github/extensions/` are all loaded and run in parallel.
+- Extensions are reloaded on `/clear` and stopped on CLI exit.
 
 ### Use Cases
 
 | Use Case | Hook | Strategy |
 |----------|------|----------|
-| **Guardrails** | `preToolUse` | Block edits to protected paths (e.g., `*.lock`, `prod.config`) |
-| **Audit logging** | `postToolUse` | Log all tool invocations to a file or service |
-| **Policy enforcement** | `preToolUse` | Prevent `shell` commands matching dangerous patterns |
-| **Session telemetry** | `sessionStart` / `sessionEnd` | Track session duration and usage |
-| **Error alerting** | `errorOccurred` | Send notifications on agent errors |
-| **Quality gates** | `subagentStop` | Validate subagent output before accepting |
+| **Guardrails** | `onPreToolUse` | Block edits to protected paths (e.g., `*.lock`, `prod.config`) |
+| **Audit logging** | `onPostToolUse` | Log all tool invocations to a JSONL file |
+| **Policy enforcement** | `onPreToolUse` | Deny `bash` commands matching dangerous patterns |
+| **Session telemetry** | `onSessionStart` / `onSessionEnd` | Track session duration and usage |
+| **Config freshness** | `onSessionStart` | Remind user to re-run setup if config is stale |
+| **Error alerting** | `onErrorOccurred` | Send notifications on agent errors |
 
 ### Example
 
-File: `.github/hooks/guardrails.json`
+File: `.github/extensions/guardrails/extension.mjs`
 
-```json
-{
-  "version": 1,
-  "hooks": {
-    "sessionStart": [
-      {
-        "type": "command",
-        "bash": "echo \"[$(date -u +%Y-%m-%dT%H:%M:%SZ)] Session started by ${USER}\" >> .copilot-audit.log",
-        "powershell": "Add-Content -Path .copilot-audit.log -Value \"[$(Get-Date -Format o)] Session started by $env:USERNAME\"",
-        "timeoutSec": 5
-      }
-    ],
-    "preToolUse": [
-      {
-        "type": "command",
-        "bash": "INPUT=$(cat); ARGS=$(echo \"$INPUT\" | jq -r '.toolArgs'); if echo \"$ARGS\" | grep -qE '(\\.env|secrets\\.json|prod\\.config)'; then echo '{\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"Cannot modify sensitive files\"}'; fi",
-        "powershell": "$input = [Console]::In.ReadToEnd(); $data = $input | ConvertFrom-Json; if ($data.toolArgs -match '(\\.env|secrets\\.json|prod\\.config)') { Write-Output '{\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"Cannot modify sensitive files\"}' }",
-        "timeoutSec": 5
-      }
-    ],
-    "postToolUse": [
-      {
-        "type": "command",
-        "bash": "INPUT=$(cat); TOOL=$(echo \"$INPUT\" | jq -r '.toolName'); echo \"[$(date -u +%Y-%m-%dT%H:%M:%SZ)] Tool: $TOOL\" >> .copilot-audit.log",
-        "powershell": "$input = [Console]::In.ReadToEnd(); $data = $input | ConvertFrom-Json; Add-Content -Path .copilot-audit.log -Value \"[$(Get-Date -Format o)] Tool: $($data.toolName)\"",
-        "timeoutSec": 5
-      }
-    ]
-  }
-}
+```js
+import { appendFileSync, mkdirSync } from "node:fs";
+import { joinSession } from "@github/copilot-sdk/extension";
+
+const ts = () => new Date().toISOString();
+
+const session = await joinSession({
+    hooks: {
+        onSessionStart: async () => {
+            mkdirSync(".copilot", { recursive: true });
+            appendFileSync(".copilot/audit.log", `[${ts()}] Session started\n`, "utf-8");
+        },
+        onPreToolUse: async (input) => {
+            const args = input.toolArgs ?? {};
+            const target = String(args.path ?? args.command ?? "");
+            if (/\.env|secrets\.json|prod\.config/.test(target)) {
+                return {
+                    permissionDecision: "deny",
+                    permissionDecisionReason: "Cannot modify sensitive files",
+                };
+            }
+        },
+        onPostToolUse: async (input) => {
+            appendFileSync(
+                ".copilot/audit.log",
+                `[${ts()}] Tool: ${input.toolName}\n`,
+                "utf-8",
+            );
+        },
+    },
+    tools: [],
+});
 ```
 
 ### Pro Tips
 
 - **Start with logging hooks** before enforcement hooks. Understand what Copilot is doing before blocking it.
-- **Keep hooks fast.** A slow `preToolUse` hook delays every single tool call. Target under 1 second.
-- **Use `preToolUse` sparingly.** Over-restrictive hooks make Copilot unable to work effectively — it'll keep hitting blocks and waste context retrying.
-- **Test hooks locally** by piping sample JSON: `echo '{"toolName":"edit","toolArgs":"{\"path\":\"test.lock\"}"}' | ./scripts/check-guardrails.sh`
-- **External scripts** are easier to maintain than inline shell in JSON. Reference them: `"bash": "./scripts/check-guardrails.sh"`.
+- **Keep `onPostToolUse` fast** — it fires on every tool call. Avoid synchronous I/O where possible.
+- **Use `onPreToolUse` sparingly.** Over-restrictive hooks make Copilot unable to work effectively.
+- **Wrap all hook bodies in `try { } catch { }`** — unhandled errors in hooks kill the extension process.
+- **Use `session.log()` instead of `console.log()`** — output appears in the CLI timeline, not lost in stdout.
 
 ---
 

@@ -1,43 +1,76 @@
 ---
-applyTo: ".github/hooks/**/*.json"
+applyTo: ".github/extensions/**/*.mjs"
 ---
 
 <!-- managed-by: preflight -->
 
-# Hook Configuration Conventions
+# Extension Conventions
 
 ## Structure
 
-- Every hook config file must have `"version": 1` at the top level.
-- Use the `hooks` object with event names as keys: `sessionStart`, `sessionEnd`, `postToolUse`, `preToolUse`, `userPromptSubmitted`, `errorOccurred`.
-- Each event contains an array of step objects. Each step has `type`, `bash`, `powershell`, and `timeoutSec` at the top level — no `event` or `steps` wrapper.
+- Every extension lives in its own subdirectory under `.github/extensions/<name>/`.
+- The entry point must be named `extension.mjs` (ES module, `.mjs` required).
+- Import from `@github/copilot-sdk/extension` — the SDK is resolved automatically by the CLI, no `npm install` needed.
+- Call `joinSession()` at the top level with `hooks` and `tools` options.
 
-## Dual-Platform Commands
+## Hook Names
 
-- Every `command` step must include both `bash` and `powershell` fields at the top level of the step object.
-- Both must produce identical behavior — test on both platforms.
-- Bash: use `|| true` for non-critical commands to avoid breaking the hook chain.
-- PowerShell: wrap non-critical commands in `try {} catch {}`.
+Use these exact names in the `hooks` object:
 
-## Input Mechanism
+| Key | Fires when |
+|-----|------------|
+| `onSessionStart` | Session begins or resumes |
+| `onSessionEnd` | Session ends |
+| `onUserPromptSubmitted` | User sends a message |
+| `onPreToolUse` | Before a tool runs |
+| `onPostToolUse` | After a tool completes |
+| `onErrorOccurred` | An error occurs |
 
-- Hooks receive context as JSON via **stdin**, not environment variables.
-- Bash: `INPUT=$(cat)` then parse with `jq` (e.g., `echo "$INPUT" | jq -r '.toolName'`).
-- PowerShell: `$in = [Console]::In.ReadToEnd() | ConvertFrom-Json` then access properties (e.g., `$in.toolName`).
-- `postToolUse` stdin includes `toolName`, `toolArgs`, and `toolResult` fields.
-- `sessionStart` stdin includes `timestamp`, `cwd`, `source`, and `initialPrompt` fields.
-- `sessionEnd` stdin includes `timestamp`, `cwd`, and `reason` fields.
+## Input Objects
+
+- All hooks receive `{ timestamp, cwd }` at minimum.
+- `onSessionStart`: also `{ source }` — `"startup"`, `"resume"`, or `"new"`.
+- `onPreToolUse` / `onPostToolUse`: also `{ toolName, toolArgs }`. `toolArgs` is an object (not a string).
+- `onSessionEnd`: also `{ reason }` — `"complete"`, `"error"`, `"abort"`, `"timeout"`, or `"user_exit"`.
+
+## Logging
+
+- Use `session.log(message, { level })` to surface messages in the CLI timeline.
+- Levels: `"info"` (default), `"warning"`, `"error"`.
+- Use `{ ephemeral: true }` for transient status messages.
+- Do NOT use `console.log()` — output goes to the extension's stdout/stderr, not the timeline.
+
+## Error Handling
+
+- Wrap every hook body in `try { } catch { }` — unhandled errors terminate the extension process.
+- For non-critical side effects (logging, file writes), swallow errors silently.
+- For guardrail hooks, surface errors to the user via `session.log()` before returning.
+
+## File I/O
+
+- Node.js built-ins (`node:fs`, `node:path`, `node:child_process`) are available without installing packages.
+- Use `existsSync` + `mkdirSync` to safely create directories before writing.
+- Write ephemeral data to `.copilot/` (add to `.gitignore`).
+- Use `appendFileSync` with `"utf-8"` encoding for JSONL log files.
 
 ## Performance
 
-- Hooks fire on every tool call — keep them under 100ms execution time.
-- Prefer simple append operations over read-modify-write.
-- Use `timeoutSec: 5` as default; hooks that exceed timeout are killed.
+- `onPostToolUse` fires on every tool call — keep it under 5ms. Prefer simple `appendFileSync` over read-modify-write.
+- `onPreToolUse` blocks tool execution until the hook returns — keep it fast or tools feel sluggish.
+- If complex logic is needed, extract it into a helper module alongside `extension.mjs`.
 
-## Conventions
+## Guardrail Pattern
 
-- Use JSONL (one JSON object per line) for log files — append-only, no race conditions.
-- Store ephemeral data in `.copilot/` (add to `.gitignore`).
-- Add `_comment` field for human-readable documentation inside JSON configs.
+Return this shape from `onPreToolUse` to block a tool call:
+
+```js
+return {
+    permissionDecision: "deny",
+    permissionDecisionReason: "Reason shown to the agent",
+};
+```
+
+Return `{ permissionDecision: "allow" }` or `undefined` to allow.
 
 <!-- end-managed-by: preflight -->
+

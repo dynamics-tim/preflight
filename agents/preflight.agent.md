@@ -145,6 +145,7 @@ Use `glob` to check for:
 - `.github/agents/*.agent.md`
 - `.github/skills/`
 - `.github/hooks/`
+- `.github/extensions/`
 - `.copilot/`
 - `AGENTS.md`
 - `CLAUDE.md`
@@ -178,7 +179,7 @@ Use `glob` for:
 
 #### 1i. Check for plugin updates
 
-The current installed version of preflight is **CURRENT_PLUGIN_VERSION = "1.2.2"**.
+The current installed version of preflight is **CURRENT_PLUGIN_VERSION = "1.3.0"**.
 
 Silently perform two checks:
 
@@ -489,24 +490,24 @@ Adapt the `enum` and `default` arrays to only include agents relevant to the pro
 
 This step exists because generated agents use framework defaults that are wrong for projects with custom test infrastructure. Never skip it.
 
-#### Category 4: Session learning hooks
+#### Category 4: Session learning
 
 **Recommend when** the project has at least some Copilot config already set up (instructions or agents). This is an advanced feature that benefits active Copilot users.
 
-Offer to install the session-logger hook, which enables the `@skill-extractor` agent to analyze session activity and generate reusable skills.
+Offer to install the session-logger extension, which enables the `@skill-extractor` agent to analyze session activity and generate reusable skills.
 
-File: `.github/hooks/session-logger.json`
+File: `.github/extensions/session-logger/extension.mjs`
 
 Use `ask_user` with a boolean:
 
 ```json
 {
-  "message": "⚡ **Session learning** (`.github/hooks/session-logger.json`)\n\nInstructions and agents tell Copilot *how* to work. **Hooks** automate what happens *around* sessions — like git hooks but for Copilot.\n\nThis hook tracks your workflow patterns (<1ms per tool call). After a few sessions, `@skill-extractor` can analyze them and auto-generate reusable **skills** — think of them as cheat sheets that load only when relevant, so Copilot gets better at your specific workflows over time.\n\n📁 Logs stay local in `.copilot/` (not committed).",
+  "message": "⚡ **Session learning** (`.github/extensions/session-logger/extension.mjs`)\n\nInstructions and agents tell Copilot *how* to work. **Extensions** automate what happens *around* sessions — like git hooks but for Copilot.\n\nThis extension tracks your workflow patterns (<1ms per tool call). After a few sessions, `@skill-extractor` can analyze them and auto-generate reusable **skills** — think of them as cheat sheets that load only when relevant, so Copilot gets better at your specific workflows over time.\n\n📁 Logs stay local in `.copilot/` (not committed).",
   "requestedSchema": {
     "properties": {
       "install": {
         "type": "boolean",
-        "title": "Install session-logger hook + .gitignore entry",
+        "title": "Install session-logger extension + .gitignore entry",
         "description": "Tracks tool usage per session (<1ms overhead). After 3-5 sessions, @skill-extractor can analyze patterns and auto-generate reusable skills",
         "default": false
       }
@@ -518,64 +519,98 @@ Use `ask_user` with a boolean:
 
 Default to **false** — this is opt-in for power users.
 
-If the user accepts, create `.github/hooks/session-logger.json` using the template below. Adapt if needed based on the project's detected stack.
+If the user accepts, create `.github/extensions/session-logger/extension.mjs` using the template below.
 
-```json
-{
-  "version": 1,
-  "_comment": "Session activity logger for skill extraction. Add .copilot/ to your .gitignore — logs are ephemeral. Hooks receive context as JSON via stdin.",
-  "hooks": {
-    "sessionStart": [
-      {
-        "type": "command",
-        "bash": "mkdir -p .copilot && [ -f .copilot/session-activity.jsonl ] && mv .copilot/session-activity.jsonl .copilot/session-activity.prev.jsonl 2>/dev/null; echo '{\"ts\":\"'$(date -u '+%Y-%m-%dT%H:%M:%SZ')'\",\"event\":\"session_start\",\"cwd\":\"'$(basename \"$PWD\")'\"}' >> .copilot/session-activity.jsonl && [ -f .copilot/pending-skill-review ] && echo '[skill-extractor] Previous session has unreviewed patterns — say \"review last session\" to extract skills, or \"evaluate skills\" to improve existing ones.' >&2 || true",
-        "powershell": "if (-not (Test-Path .copilot)) { New-Item -ItemType Directory -Path .copilot -Force | Out-Null }; if (Test-Path .copilot/session-activity.jsonl) { Move-Item .copilot/session-activity.jsonl .copilot/session-activity.prev.jsonl -Force }; $ts = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ'); Add-Content -Path .copilot/session-activity.jsonl -Value ('{\"ts\":\"' + $ts + '\",\"event\":\"session_start\",\"cwd\":\"' + (Split-Path -Leaf (Get-Location)) + '\"}') -Encoding UTF8; if (Test-Path .copilot/pending-skill-review) { Write-Host '[skill-extractor] Previous session has unreviewed patterns - say \"review last session\" to extract skills, or \"evaluate skills\" to improve existing ones.' }",
-        "timeoutSec": 5
-      }
-    ],
-    "postToolUse": [
-      {
-        "type": "command",
-        "bash": "INPUT=$(cat); TOOL=$(echo \"$INPUT\" | jq -r '.toolName // \"unknown\"'); ARGS=$(echo \"$INPUT\" | jq -r '.toolArgs // \"\"'); if echo \"$ARGS\" | jq empty 2>/dev/null; then P=$(echo \"$ARGS\" | jq -r '.path // empty' 2>/dev/null); C=$(echo \"$ARGS\" | jq -r '.command // empty' 2>/dev/null); D=$(echo \"$ARGS\" | jq -r '.description // empty' 2>/dev/null); I=$(echo \"$ARGS\" | jq -r '.intent // empty' 2>/dev/null); PA=$(echo \"$ARGS\" | jq -r '.pattern // empty' 2>/dev/null); else P=$(echo \"$INPUT\" | jq -r '.toolArgs.path // empty' 2>/dev/null); C=$(echo \"$INPUT\" | jq -r '.toolArgs.command // empty' 2>/dev/null); D=$(echo \"$INPUT\" | jq -r '.toolArgs.description // empty' 2>/dev/null); I=$(echo \"$INPUT\" | jq -r '.toolArgs.intent // empty' 2>/dev/null); PA=$(echo \"$INPUT\" | jq -r '.toolArgs.pattern // empty' 2>/dev/null); fi; [ -n \"$P\" ] && GR=$(git rev-parse --show-toplevel 2>/dev/null) && [ -n \"$GR\" ] && P=\"${P#$GR/}\"; EX=''; [ -n \"$P\" ] && EX=\"$EX,\\\"path\\\":\\\"$P\\\"\"; [ -n \"$D\" ] && EX=\"$EX,\\\"desc\\\":\\\"$D\\\"\"; [ -n \"$I\" ] && EX=\"$EX,\\\"intent\\\":\\\"$I\\\"\"; [ -n \"$PA\" ] && EX=\"$EX,\\\"pattern\\\":\\\"$PA\\\"\"; [ -n \"$C\" ] && C=$(printf '%s' \"$C\" | head -c 120 | tr '\\n' ' ') && EX=\"$EX,\\\"cmd\\\":\\\"$(printf '%s' \"$C\" | sed 's/\\\\/\\\\\\\\/g;s/\"/\\\\\"/g')\\\"\"; mkdir -p .copilot && echo '{\"ts\":\"'$(date -u '+%Y-%m-%dT%H:%M:%SZ')'\",\"tool\":\"'\"$TOOL\"'\"'\"$EX\"'}' >> .copilot/session-activity.jsonl 2>/dev/null || true",
-        "powershell": "try { $in = [Console]::In.ReadToEnd() | ConvertFrom-Json; $tool = if ($in.toolName) { $in.toolName } else { 'unknown' }; $ex = ''; try { $a = if ($in.toolArgs -is [string]) { $in.toolArgs | ConvertFrom-Json } else { $in.toolArgs }; if ($a.path) { $pVal = $a.path -replace '\\\\','/'; $gr = (git rev-parse --show-toplevel 2>$null); if ($gr) { $gr = $gr.Trim() -replace '\\\\','/'; if ($pVal.StartsWith($gr + '/',[System.StringComparison]::OrdinalIgnoreCase)) { $pVal = $pVal.Substring($gr.Length + 1) } }; $ex += ',\"path\":\"' + $pVal + '\"' }; if ($a.description) { $ex += ',\"desc\":\"' + ($a.description -replace '\"','') + '\"' }; if ($a.intent) { $ex += ',\"intent\":\"' + ($a.intent -replace '\"','') + '\"' }; if ($a.pattern) { $ex += ',\"pattern\":\"' + ($a.pattern -replace '\"','') + '\"' }; if ($a.command) { $c = $a.command -replace \"`n\",' '; if ($c.Length -gt 120) { $c = $c.Substring(0,120) }; $ex += ',\"cmd\":\"' + ($c -replace '\\\\','\\\\' -replace '\"','\\\"') + '\"' } } catch {}; if (-not (Test-Path .copilot)) { New-Item -ItemType Directory -Path .copilot -Force | Out-Null }; Add-Content -Path .copilot/session-activity.jsonl -Value ('{\"ts\":\"' + (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ') + '\",\"tool\":\"' + $tool + '\"' + $ex + '}') -Encoding UTF8 } catch {}",
-        "timeoutSec": 5
-      }
-    ],
-    "sessionEnd": [
-      {
-        "type": "command",
-        "bash": "mkdir -p .copilot && echo '{\"ts\":\"'$(date -u '+%Y-%m-%dT%H:%M:%SZ')'\",\"event\":\"session_end\"}' >> .copilot/session-activity.jsonl && LC=$(wc -l < .copilot/session-activity.jsonl 2>/dev/null || echo 0) && [ \"$LC\" -ge 10 ] && echo 'review' > .copilot/pending-skill-review || true",
-        "powershell": "if (-not (Test-Path .copilot)) { New-Item -ItemType Directory -Path .copilot -Force | Out-Null }; Add-Content -Path .copilot/session-activity.jsonl -Value ('{\"ts\":\"' + (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ') + '\",\"event\":\"session_end\"}') -Encoding UTF8; $lc = (Get-Content .copilot/session-activity.jsonl -ErrorAction SilentlyContinue | Measure-Object -Line).Lines; if ($lc -ge 10) { Set-Content -Path .copilot/pending-skill-review -Value 'review' -Encoding UTF8 }",
-        "timeoutSec": 5
-      }
-    ]
-  }
-}
+```js
+import { readFileSync, existsSync, mkdirSync, appendFileSync, renameSync, writeFileSync } from "node:fs";
+import { joinSession } from "@github/copilot-sdk/extension";
+
+const DIR = ".copilot";
+const LOG = `${DIR}/session-activity.jsonl`;
+const PREV = `${DIR}/session-activity.prev.jsonl`;
+const PENDING = `${DIR}/pending-skill-review`;
+
+const ts = () => new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
+const cwd = () => process.cwd().split(/[/\\]/).pop() ?? "";
+
+const session = await joinSession({
+    hooks: {
+        onSessionStart: async () => {
+            try {
+                mkdirSync(DIR, { recursive: true });
+                if (existsSync(LOG)) renameSync(LOG, PREV);
+                appendFileSync(
+                    LOG,
+                    JSON.stringify({ ts: ts(), event: "session_start", cwd: cwd() }) + "\n",
+                    "utf-8",
+                );
+                if (existsSync(PENDING)) {
+                    await session.log(
+                        '[skill-extractor] Previous session has unreviewed patterns — say "review last session" to extract skills, or "evaluate skills" to improve existing ones.',
+                        { level: "info" },
+                    );
+                }
+            } catch { }
+        },
+
+        onPostToolUse: async (input) => {
+            try {
+                mkdirSync(DIR, { recursive: true });
+                const entry = { ts: ts(), tool: input.toolName };
+                const a = input.toolArgs;
+                if (a) {
+                    if (a.path)        entry.path    = a.path;
+                    if (a.description) entry.desc    = a.description;
+                    if (a.intent)      entry.intent  = a.intent;
+                    if (a.pattern)     entry.pattern = a.pattern;
+                    if (a.command)     entry.cmd     = String(a.command).slice(0, 120).replace(/\n/g, " ");
+                }
+                appendFileSync(LOG, JSON.stringify(entry) + "\n", "utf-8");
+            } catch { }
+        },
+
+        onSessionEnd: async () => {
+            try {
+                mkdirSync(DIR, { recursive: true });
+                appendFileSync(
+                    LOG,
+                    JSON.stringify({ ts: ts(), event: "session_end" }) + "\n",
+                    "utf-8",
+                );
+                if (existsSync(LOG)) {
+                    const lines = readFileSync(LOG, "utf-8").split("\n").filter((l) => l.trim()).length;
+                    if (lines >= 10) writeFileSync(PENDING, "review", "utf-8");
+                }
+            } catch { }
+        },
+    },
+    tools: [],
+});
 ```
 
 Also append `.copilot/` to the project's `.gitignore` (create it if it doesn't exist).
 
-Add both files to the `managedFiles` array in `.preflight-state.json`.
+Add the extension file to the `managedFiles` array in `.preflight-state.json`.
 
 #### Category 5: Config maintenance
 
 **Always recommend** when the project has a `.github/.preflight-state.json` from a previous run. Also recommend on first runs — it ensures future re-runs are prompted.
 
-Offer to install the config-freshness hook, which reminds the user to re-run preflight when the configuration becomes stale.
+Offer to install the config-freshness extension, which reminds the user to re-run preflight when the configuration becomes stale.
 
-File: `.github/hooks/config-freshness.json`
+File: `.github/extensions/config-freshness/extension.mjs`
 
 Use `ask_user` with a structured form:
 
 ```json
 {
-  "message": "🔄 **Config maintenance** (`.github/hooks/config-freshness.json`)\n\nYou just set up session learning. This last hook keeps everything fresh — your project evolves, and this checks once at session start: if your config is stale, it shows a one-line reminder. Commit it once, every team member benefits.\n\nFor deeper drift — like instruction files that reference stale patterns after a big refactor — run `@preflight audit` anytime.",
+  "message": "🔄 **Config maintenance** (`.github/extensions/config-freshness/extension.mjs`)\n\nYou just set up session learning. This last extension keeps everything fresh — your project evolves, and this checks once at session start: if your config is stale, it shows a one-line reminder. Commit it once, every team member benefits.\n\nFor deeper drift — like instruction files that reference stale patterns after a big refactor — run `@preflight audit` anytime.",
   "requestedSchema": {
     "properties": {
       "install": {
         "type": "boolean",
         "title": "Install config freshness checker",
-        "description": "Adds a sessionStart hook that reminds you when Copilot config may need updating",
+        "description": "Adds a sessionStart extension that reminds you when Copilot config may need updating",
         "default": true
       },
       "thresholdDays": {
@@ -594,26 +629,45 @@ Use `ask_user` with a structured form:
 
 Default to **true** — this is a low-risk, high-value feature.
 
-If the user accepts, create `.github/hooks/config-freshness.json` using the template below. If the user specified a custom `thresholdDays`, embed it in the state file.
+If the user accepts, create `.github/extensions/config-freshness/extension.mjs` using the template below. If the user specified a custom `thresholdDays`, embed it in the state file.
 
-```json
-{
-  "version": 1,
-  "_comment": "Config freshness checker. Runs at session start to remind the user to re-run @preflight if the config is stale (default: 30 days). Reads .github/.preflight-state.json for lastRun timestamp and optional reminderDaysThreshold.",
-  "hooks": {
-    "sessionStart": [
-      {
-        "type": "command",
-        "bash": "if [ -f .github/.preflight-state.json ]; then python3 -c \"import json,sys,datetime;s=json.load(open('.github/.preflight-state.json'));lr=datetime.datetime.fromisoformat(s['lastRun'].replace('Z','+00:00'));th=int(s.get('reminderDaysThreshold',30));d=(datetime.datetime.now(datetime.timezone.utc)-lr).days;print('[preflight] Config is '+str(d)+' days old - run @preflight to update.',file=sys.stderr) if d>=th else None\" 2>&1 >&2 || node -e \"try{var s=JSON.parse(require('fs').readFileSync('.github/.preflight-state.json','utf8'));var d=Math.floor((Date.now()-new Date(s.lastRun))/86400000);var t=parseInt(s.reminderDaysThreshold||30);if(d>=t)process.stderr.write('[preflight] Config is '+d+' days old - run @preflight to update.\\n')}catch(e){}\" 2>/dev/null || true; else echo '[preflight] No Copilot config found — run @preflight to set up this project.' >&2; fi || true",
-        "powershell": "try { if (Test-Path .github/.preflight-state.json) { $s = Get-Content .github/.preflight-state.json -Raw | ConvertFrom-Json; $lastRun = [datetime]::Parse($s.lastRun).ToUniversalTime(); $threshold = if ($s.reminderDaysThreshold) { [int]$s.reminderDaysThreshold } else { 30 }; $days = ((Get-Date).ToUniversalTime() - $lastRun).Days; if ($days -ge $threshold) { Write-Host \"[preflight] Config is $days days old — run @preflight to update.\" } } else { Write-Host '[preflight] No Copilot config found — run @preflight to set up this project.' } } catch {}",
-        "timeoutSec": 5
-      }
-    ]
-  }
-}
+```js
+import { readFileSync, existsSync } from "node:fs";
+import { join } from "node:path";
+import { joinSession } from "@github/copilot-sdk/extension";
+
+const session = await joinSession({
+    hooks: {
+        onSessionStart: async () => {
+            const statePath = join(process.cwd(), ".github", ".preflight-state.json");
+            if (!existsSync(statePath)) {
+                await session.log(
+                    "[preflight] No Copilot config found — run @preflight to set up this project.",
+                    { level: "warning" },
+                );
+                return;
+            }
+            try {
+                const state = JSON.parse(readFileSync(statePath, "utf-8"));
+                const lastRun = new Date(state.lastRun);
+                const threshold = parseInt(state.reminderDaysThreshold || 30, 10);
+                const days = Math.floor((Date.now() - lastRun.getTime()) / 86_400_000);
+                if (days >= threshold) {
+                    await session.log(
+                        `[preflight] Config is ${days} days old — run @preflight to update.`,
+                        { level: "warning" },
+                    );
+                }
+            } catch {
+                // Silently ignore parse errors
+            }
+        },
+    },
+    tools: [],
+});
 ```
 
-Add the hook file to the `managedFiles` array in `.preflight-state.json`. Also store `"reminderDaysThreshold"` in the state file (the value from the user's selection, or 30 if they accepted the default).
+Add the extension file to the `managedFiles` array in `.preflight-state.json`. Also store `"reminderDaysThreshold"` in the state file (the value from the user's selection, or 30 if they accepted the default).
 
 #### Category 6: MCP config (optional — v2)
 
@@ -666,7 +720,7 @@ Use native `create` or `edit` tools. After creating each file, validate:
 - YAML frontmatter parses correctly (test by reading back the file)
 - Required frontmatter fields present: `applyTo` for instruction files, `name` + `description` + `tools` for agent files
 - Managed markers are balanced (every `<!-- managed-by: preflight -->` has a matching `<!-- end-managed-by: preflight -->`)
-- Hook JSON files parse as valid JSON with `"version": 1` at top level
+- Extension `.mjs` files are valid ES modules with a top-level `await joinSession(...)` call
 
 If any validation fails, fix the file silently and note the correction in the Phase 4d summary.
 
@@ -677,7 +731,7 @@ After all files are created, create or update `.github/.preflight-state.json`:
 ```json
 {
   "version": "1.0.0",
-  "pluginVersion": "1.2.2",
+  "pluginVersion": "1.3.0",
   "lastRun": "<ISO 8601 timestamp>",
   "detectedStack": {
     "languages": ["typescript"],
@@ -694,7 +748,7 @@ After all files are created, create or update `.github/.preflight-state.json`:
 }
 ```
 
-- `pluginVersion` — always set to `CURRENT_PLUGIN_VERSION` ("1.2.2"). This is what future runs compare against to detect version drift and surface config improvements from newer plugin releases.
+- `pluginVersion` — always set to `CURRENT_PLUGIN_VERSION` ("1.3.0"). This is what future runs compare against to detect version drift and surface config improvements from newer plugin releases.
 
 If `.preflight-state.json` already exists, update it (merge `managedFiles`, update `lastRun`, `detectedStack`, and `pluginVersion`).
 

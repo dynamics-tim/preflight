@@ -1,6 +1,22 @@
 {
   "_comment": "Maps each plugin release to config improvements. Used by the preflight agent to surface targeted upgrade actions when a version bump is detected between the installed plugin and the version stored in .preflight-state.json.",
   "changelog": {
+    "1.3.0": {
+      "summary": "Migrated hooks from inert JSON config files to SDK-based extensions — hooks now actually execute at session start and on every tool call.",
+      "configImpacts": [
+        {
+          "type": "breaking_change",
+          "description": "Session-logger and config-freshness hooks were previously generated as .github/hooks/*.json files. These files were never executed by Copilot CLI — the runtime requires .github/extensions/<name>/extension.mjs files using @github/copilot-sdk. Both hooks have been reimplemented as SDK extensions.",
+          "affectedFiles": [
+            ".github/hooks/session-logger.json",
+            ".github/hooks/config-freshness.json",
+            ".github/extensions/session-logger/extension.mjs",
+            ".github/extensions/config-freshness/extension.mjs"
+          ],
+          "recommendation": "Delete .github/hooks/session-logger.json and .github/hooks/config-freshness.json. Re-run @preflight to install the replacement extensions in .github/extensions/. Update managedFiles in .github/.preflight-state.json accordingly."
+        }
+      ]
+    },
     "1.2.2": {
       "summary": "Removed broken skill-usage tracking — postToolUse hooks lack skill context, so skill-usage.json was always empty. Eval and cleanup workflows now use session activity pattern matching instead.",
       "configImpacts": [
