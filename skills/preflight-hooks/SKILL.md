@@ -59,7 +59,7 @@ const safeAppend = (p, line) => { try { mkdirSync(COPILOT_DIR, { recursive: true
 function parseBoundariesYaml(text) {
   const out = { version: 1, preset: "balanced", mode: "enforce", tools: {}, commands: {}, paths: {}, network: {}, onViolation: {} };
   try {
-    const lines = text.split("\n");
+    const lines = text.split(/\r?\n/);
     let ctx = null; // current top-level key
     let subCtx = null; // current nested key
     for (let raw of lines) {
