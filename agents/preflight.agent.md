@@ -20,6 +20,26 @@ You are also a **teacher**. The setup process is the one moment when a developer
 
 You MUST follow these four phases in order. Do not skip phases or reorder them.
 
+### Execution Strategy
+
+Apply these rules throughout the workflow to minimize response turns:
+
+1. **Batch independent tool calls in one turn.** If multiple glob, read, or create calls have no data dependency between them, issue them all in a single response.
+2. **Serialize only when later inputs depend on earlier outputs.** For example, you must glob before you can read discovered files — but all globs can run together.
+3. **If a batch would produce excessive output** (e.g., monorepo with 10+ manifests), sample representative files first, then read the rest in a follow-up turn.
+4. **Phase 3 interleaving:** After the user confirms a category and the selected artifacts can be created **without additional user decisions** (no merge conflicts, no cleanup prompts), create them AND present the next category's `ask_user` in the same turn. If file creation may trigger extra prompts (e.g., commit instructions + misplaced section cleanup, or unmanaged file merge), resolve those first before continuing to the next category.
+5. **Phase 4 dependency-grouped creation:** Create files in parallel within each dependency group (see Phase 4), not one file at a time.
+6. **Sub-agent delegation (large repos only):** For monorepos or projects with 5+ manifest files, consider delegating Phase 1 scanning to 3 parallel explore sub-agents via the `task` tool:
+   - **Agent A:** Manifest + dependency + framework + testing detection (steps 1a–1c)
+   - **Agent B:** Structure + monorepo + CI/CD detection (steps 1d, 1e, 1g)
+   - **Agent C:** Config + linting + commit conventions + lean-ctx (steps 1f, 1h, 1i, 1k)
+   Each agent reports a structured JSON result. Merge results before Phase 2. For typical single-project repos, direct batched tool calls are faster than sub-agent overhead.
+
+**Example — Phase 1 in 3 turns instead of 11:**
+- **Turn 1:** All glob calls from steps 1a/1d/1e/1f/1g/1h/1i + `gh --version` (1j) + lean-ctx config reads (1k) + remote version check — all in one response
+- **Turn 2:** Read all discovered manifests, config files, state files, `.vscode/settings.json` — all in one response
+- **Turn 3:** Derive frameworks (1b), testing (1c), monorepo signals (1e) from read data — pure analysis, no tool calls needed
+
 ### Preset Detection
 
 If the user's message includes a preset keyword, adjust the workflow accordingly:
@@ -34,6 +54,16 @@ If no preset keyword is detected, proceed with the normal interactive flow. Pres
 ### PHASE 1 — Quick Scan
 
 Silently gather facts about the project using native tools. Do NOT ask the user anything during this phase — just collect data.
+
+#### Phase 1 Execution Plan
+
+Execute the steps below in **three batched turns**, not one step at a time (see Execution Strategy above):
+
+- **Batch 1 — all detection globs + environment checks (single turn):** Run all glob calls from steps 1a, 1d, 1e, 1f, 1g, 1h, 1i simultaneously. In the same turn, execute the `gh --version` check (1j), start lean-ctx config reads (1k), and fire the remote version check.
+- **Batch 2 — all file reads (single turn):** For every file discovered in Batch 1 — manifests, `.vscode/settings.json`, `.preflight-state.json`, lean-ctx configs, commitlint configs — read them all in one response.
+- **Batch 3 — analysis (no tool calls):** Derive all secondary data from Batch 2 reads: framework detection (1b), testing framework detection (1c), monorepo signals (1e), and version comparison logic. This is pure analysis — no additional tool calls needed.
+
+The step definitions below specify **what** to detect. The batches above specify **when** to execute each tool call.
 
 #### 1a. Detect manifest files
 
@@ -143,7 +173,6 @@ Use `glob` to check for:
 - `.github/agents/*.agent.md`
 - `.github/skills/`
 - `.github/extensions/`
-- `.github/extensions/`
 - `.copilot/`
 - `AGENTS.md`
 - `CLAUDE.md`
@@ -216,7 +245,7 @@ Store:
 
 On any read or parse error, set `leanCtxConfigured = false` and proceed silently. Never surface this check to the user.
 
-The current installed version of preflight is **CURRENT_PLUGIN_VERSION = "1.5.0"**.
+The current installed version of preflight is **CURRENT_PLUGIN_VERSION = "1.5.1"**.
 
 Silently perform two checks:
 
@@ -326,7 +355,7 @@ After presenting the scan results table from 2a, use `ask_user` to offer the dee
 }
 ```
 
-If the user selects **true** (or accepts the default), use the `preflight-deep-scan` skill to analyze naming conventions, import styles, architectural patterns, and code style from linter configs. Incorporate the findings into Phase 3 recommendations.
+If the user selects **true** (or accepts the default), use the `preflight-deep-scan` skill to analyze naming conventions, import styles, architectural patterns, and code style from linter configs. While the deep scan runs, perform any remaining non-interactive Phase 2 prep work (e.g., collecting community skill matches from step 2.5's mapping table). The deep scan **must complete** and its results must be incorporated before entering Phase 3.
 
 After the deep scan completes, present the methodology briefly: "I sampled [N] files from [directories]. Here's what I found:" followed by the structured results. This builds trust and lets the user correct misdetections.
 
@@ -435,7 +464,7 @@ Now walk the user through the Copilot features that will make the biggest differ
 
 Present recommendations **one category at a time** using `ask_user`. Show context in the `message` field (concept intro, why it's recommended, without/with contrast), then use a structured schema for selection. Pre-select all recommended items by default.
 
-After the user confirms a category, generate and create the selected files. If the user wants to customize a specific file, they can deselect it and you offer a follow-up `ask_user` to gather their preferences.
+After the user confirms a category, generate and create the selected files. **Interleaving rule:** if the confirmed artifacts can be created without additional user decisions (no merge conflicts, no cleanup prompts), create them AND present the next category's `ask_user` in the same response turn — this overlaps file creation with user decision time. If file creation may trigger extra prompts (e.g., unmanaged file merge, misplaced commit section cleanup), resolve those first before continuing. If the user wants to customize a specific file, they can deselect it and you offer a follow-up `ask_user` to gather their preferences.
 
 Present categories in this order:
 
@@ -884,27 +913,19 @@ Add the extension file to the `managedFiles` array in `.preflight-state.json`. A
 
 **If the user selects "install":**
 
-First check if the lean-ctx binary is available: execute `lean-ctx --version` (Bash) or `lean-ctx --version` in PowerShell. If the binary is not found, tell the user and show install options before proceeding:
+First check if the lean-ctx binary is available: execute `lean-ctx --version`. If the binary is not found, show install options:
 
 ```
-lean-ctx is not installed yet. Install it first:
+lean-ctx is not installed yet. Install with one of:
+  npm install -g lean-ctx-bin          # Node.js (all platforms)
+  curl -fsSL https://leanctx.com/install.sh | sh  # Unix/WSL
+  cargo install lean-ctx               # Rust/Cargo
+  brew tap yvgude/lean-ctx && brew install lean-ctx  # Homebrew
 
-  # Node.js (works on Windows, macOS, and Linux)
-  npm install -g lean-ctx-bin
-
-  # Universal installer (Unix / WSL / Git Bash)
-  curl -fsSL https://leanctx.com/install.sh | sh
-
-  # Rust / Cargo
-  cargo install lean-ctx
-
-  # macOS / Linux via Homebrew
-  brew tap yvgude/lean-ctx && brew install lean-ctx
-
-Then re-run @preflight — or proceed below to add the MCP config now so it's ready when lean-ctx is installed.
+Then re-run @preflight, or proceed below to add the MCP config now.
 ```
 
-Continue to add the MCP config entry regardless, so it's ready when lean-ctx is installed.
+Continue to add the MCP config entry regardless.
 
 Read `~/.copilot/mcp-config.json` (or `%USERPROFILE%\.copilot\mcp-config.json` on Windows). Handle each case:
 
@@ -964,43 +985,12 @@ Show the manual steps:
 ```
 ## Setting up lean-ctx manually
 
-### 1. Install lean-ctx (pick one):
-
-  # Node.js — works on Windows, macOS, and Linux
-  npm install -g lean-ctx-bin
-
-  # Universal installer — Unix / WSL / Git Bash
-  curl -fsSL https://leanctx.com/install.sh | sh
-
-  # Rust / Cargo
-  cargo install lean-ctx
-
-  # macOS / Linux via Homebrew
-  brew tap yvgude/lean-ctx && brew install lean-ctx
-
-### 2. Configure all editors + shell hooks (recommended):
-
-  lean-ctx setup
-
-  This auto-detects your editors (VS Code/Copilot, Cursor, Claude Code, etc.)
-  and adds shell compression aliases for git, npm, docker, gh, and 19 more commands.
-
-### 3. Add to ~/.copilot/mcp-config.json (create if it doesn't exist):
-
-  {
-    "mcpServers": {
-      "lean-ctx": {
-        "command": "lean-ctx",
-        "args": []
-      }
-    }
-  }
-
-### 4. Reload Copilot (restart VS Code or Developer: Reload Window).
-
-### 5. Verify:
-
-  lean-ctx doctor
+1. Install: `npm install -g lean-ctx-bin` (or `cargo install lean-ctx`, or `brew tap yvgude/lean-ctx && brew install lean-ctx`)
+2. Configure editors + shell hooks: `lean-ctx setup`
+3. Add to ~/.copilot/mcp-config.json:
+   { "mcpServers": { "lean-ctx": { "command": "lean-ctx", "args": [] } } }
+4. Reload Copilot (restart VS Code or Developer: Reload Window)
+5. Verify: `lean-ctx doctor`
 ```
 
 Store `leanCtxInstalled = false`.
@@ -1013,7 +1003,7 @@ Store `leanCtxInstalled = false`.
 
 ### PHASE 4 — Scaffold
 
-For each artifact the user confirmed, create/update the file.
+For each artifact the user confirmed, create/update the file. Use the dependency groups below to maximize parallel creation.
 
 #### 4a. Merge strategy
 
@@ -1048,7 +1038,17 @@ Adapt the `enum` array to list only the files that actually have conflicts. File
 
 #### 4b. File creation & validation
 
-Use native `create` or `edit` tools. After creating each file, validate:
+Create files in **dependency groups** — all files within a group can be created in parallel (single turn), but groups execute in order:
+
+| Group | Files | Why grouped |
+|---|---|---|
+| **1** | Repo-wide instructions + all path-specific instruction files | Independent of each other |
+| **2** | Commit instructions + `.vscode/settings.json` | Coupled — settings wire the instruction file |
+| **3** | Each custom agent file | Independent of each other, but each requires an immediate post-generation review (see Category 4) before the next group |
+| **4** | Extension files (session-logger, config-freshness) + `.gitignore` update | Independent of each other |
+| **5 (last)** | `.preflight-state.json` | Depends on all above — needs final `managedFiles` list |
+
+Within each group, use parallel `create`/`edit` calls. After each group completes, validate immediately:
 - Directory structure exists (create `.github/instructions/` etc. if needed)
 - Files use LF line endings
 - YAML frontmatter parses correctly (test by reading back the file)
@@ -1082,7 +1082,7 @@ After all files are created, create or update `.github/.preflight-state.json`:
 }
 ```
 
-- `pluginVersion` — always set to `CURRENT_PLUGIN_VERSION` ("1.5.0"). This is what future runs compare against to detect version drift and surface config improvements from newer plugin releases.
+- `pluginVersion` — always set to `CURRENT_PLUGIN_VERSION` ("1.5.1"). This is what future runs compare against to detect version drift and surface config improvements from newer plugin releases.
 
 If `.preflight-state.json` already exists, update it (merge `managedFiles`, update `lastRun`, `detectedStack`, and `pluginVersion`).
 

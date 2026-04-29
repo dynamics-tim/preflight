@@ -1,6 +1,17 @@
 {
   "_comment": "Maps each plugin release to config improvements. Used by the preflight agent to surface targeted upgrade actions when a version bump is detected between the installed plugin and the version stored in .preflight-state.json.",
   "changelog": {
+    "1.5.1": {
+      "summary": "Parallelized agent workflow — Phase 1 scanning batched into 3 turns instead of 11, Phase 3 interleaving for overlapped file creation, Phase 4 dependency-grouped parallel scaffolding, optional sub-agent delegation for monorepos.",
+      "configImpacts": [
+        {
+          "type": "improvement",
+          "description": "Execution Strategy section added — the preflight agent now batches independent tool calls, interleaves Phase 3 file creation with user decisions, and creates Phase 4 files in dependency-grouped parallel batches. Typical setups complete 30-50% faster.",
+          "affectedFiles": [],
+          "recommendation": "No action needed. Re-run @preflight to benefit from the faster workflow."
+        }
+      ]
+    },
     "1.5.0": {
       "summary": "Agent consolidation — skill-extractor agent absorbed into preflight. @preflight now handles skill extraction, evaluation, and cleanup directly. Auto-routing enabled via disable-model-invocation. Dead log-tool-call scripts removed.",
       "configImpacts": [
