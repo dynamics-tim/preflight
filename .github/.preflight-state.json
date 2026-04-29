@@ -1,18 +1,30 @@
 {
   "version": "1.0.0",
-  "pluginVersion": "1.5.2",
-  "lastRun": "2025-07-17T00:00:00Z",
+  "pluginVersion": "2.0.0",
+  "lastRun": "2026-04-29T00:00:00Z",
   "confirmedStack": {
-    "languages": ["markdown", "bash", "powershell", "json", "javascript"],
+    "languages": ["markdown", "bash", "powershell", "javascript", "json"],
     "framework": null,
     "packageManager": null,
     "testFramework": null,
-    "cicd": null,
+    "cicd": "github-actions",
     "linting": [],
     "projectType": "single",
     "targetWorkspaces": [],
     "keyDirectories": ["agents/", "skills/", "copilot-architecture-class/", ".github/"],
-    "confirmedPatterns": []
+    "confirmedPatterns": [
+      "kebab-case file naming throughout",
+      "bash: snake_case functions, UPPER_SNAKE_CASE constants, set -euo pipefail",
+      "powershell: PascalCase functions (Verb-Noun), $PascalCase variables, [ordered]@{} hashtables",
+      "javascript: camelCase functions, UPPER_CASE module constants, 4-space indent, double quotes, semicolons",
+      "ES module imports: node: built-ins first, then SDK packages",
+      "async/await pattern, no .then() chains"
+    ]
+  },
+  "hubFeatures": {
+    "configFreshness": true,
+    "sessionLogger": true,
+    "guardrails": true
   },
   "managedFiles": [
     ".github/copilot-instructions.md",
@@ -21,8 +33,8 @@
     ".github/instructions/markdown.instructions.md",
     ".github/instructions/hooks.instructions.md",
     ".github/instructions/commit-message.instructions.md",
-    ".github/extensions/session-logger/extension.mjs",
-    ".github/extensions/config-freshness/extension.mjs"
+    ".github/extensions/preflight-hub/extension.mjs",
+    ".github/preflight-boundaries.yaml"
   ],
   "reminderDaysThreshold": 30
 }
