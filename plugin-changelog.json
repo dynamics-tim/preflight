@@ -1,6 +1,23 @@
 {
   "_comment": "Maps each plugin release to config improvements. Used by the preflight agent to surface targeted upgrade actions when a version bump is detected between the installed plugin and the version stored in .preflight-state.json.",
   "changelog": {
+    "2.0.0": {
+      "summary": "Agent guardrails + unified preflight-hub extension. Fixes hook overwrite bug where only one onSessionStart handler fired. New onPreToolUse boundary system via .github/preflight-boundaries.yaml with strict/balanced/permissive presets, stack-aware defaults, and @preflight tune-boundaries for data-driven policy tuning.",
+      "configImpacts": [
+        {
+          "type": "breaking",
+          "title": "Extensions consolidated into preflight-hub",
+          "description": "session-logger and config-freshness merged into a single .github/extensions/preflight-hub/extension.mjs. Fixes the hook overwrite bug where only one of the two onSessionStart handlers was firing per session.",
+          "recommendation": "Migration is automatic on next @preflight run — preflight detects existing session-logger/ and config-freshness/ folders, copies their settings into hubFeatures, scaffolds preflight-hub/, and deletes the old folders. No user action required beyond accepting the migration prompt."
+        },
+        {
+          "type": "feature",
+          "title": "Agent guardrails (OnPreToolUse boundaries)",
+          "description": "New Phase 3 category: a YAML-based policy file (.github/preflight-boundaries.yaml) that blocks destructive tool calls before they execute. Supports tool-level rules, shell command pattern matching, file-path scopes, network allow/denylists, and stack-aware defaults (D365, Node, .NET, Azure, Docker, Git, Terraform, k8s).",
+          "recommendation": "Run @preflight to opt into the new guardrails category. Pick a preset (strict / balanced / permissive) — the wizard writes a fully commented YAML you can hand-edit afterwards. Run @preflight tune-boundaries to refine rules from observed usage."
+        }
+      ]
+    },
     "1.6.0": {
       "summary": "Self-hosted marketplace — the preflight repo now doubles as a plugin marketplace, enabling version-tracked installs and one-command updates via copilot plugin update.",
       "configImpacts": [

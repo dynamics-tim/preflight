@@ -1,0 +1,5 @@
+commands:
+  warn:
+    - { pattern: 'kubectl\s+delete\s+(namespace|ns)\b', reason: 'Namespace deletion' }
+    - { pattern: 'kubectl\s+(delete|drain)\s+nodes?\b', reason: 'Node-level operation' }
+    - { pattern: 'kubectl\s+apply.*\bcontext\s+(prod|production)', reason: 'Apply against prod context' }

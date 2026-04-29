@@ -1,0 +1,6 @@
+commands:
+  blocked:
+    - { pattern: 'az\s+group\s+delete', reason: 'Azure resource group deletion' }
+    - { pattern: 'az\s+account\s+clear', reason: 'Azure CLI logout — context loss' }
+  warn:
+    - { pattern: 'az\s+\w+\s+delete\b', reason: 'Azure resource deletion' }

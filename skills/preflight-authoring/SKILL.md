@@ -107,7 +107,7 @@ the right hook events, designing fast hook bodies, and following the established
 
 4. **Use the SDK for output** — Always use `session.log()` to surface messages, not `console.log()`.
 
-5. **Reference existing extensions** — Read `session-logger/extension.mjs` and `config-freshness/extension.mjs` in `.github/extensions/` as canonical patterns.
+5. **Reference the hub extension** — Read `preflight-hub/extension.mjs` in `.github/extensions/` as the canonical extension pattern. This single file hosts session-logger, config-freshness, and guardrails behaviors via `hubFeatures` flags.
 
 ### Extension File Patterns
 

@@ -1,0 +1,6 @@
+commands:
+  blocked:
+    - { pattern: 'docker\s+system\s+prune\s+.*-a.*-f', reason: 'Aggressive system prune' }
+    - { pattern: 'docker\s+volume\s+rm', reason: 'Volume deletion' }
+  warn:
+    - { pattern: 'docker\s+rmi\s+.*-f', reason: 'Forced image removal' }

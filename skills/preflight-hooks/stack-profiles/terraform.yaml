@@ -1,0 +1,7 @@
+commands:
+  blocked: []
+  warn:
+    - { pattern: 'terraform\s+destroy', reason: 'Terraform destroy — confirm target' }
+    - { pattern: 'terraform\s+apply.*-auto-approve', reason: 'Auto-approved apply — review' }
+paths:
+  protected: ['**/terraform.tfstate', '**/terraform.tfstate.backup']

@@ -1,0 +1,5 @@
+commands:
+  blocked:
+    - { pattern: 'dotnet\s+nuget\s+push.*-s\s+(https?://)?(www\.)?nuget\.org', reason: 'NuGet.org publish' }
+  warn:
+    - { pattern: 'dotnet\s+user-secrets\s+(remove|clear)', reason: 'User-secrets removal' }

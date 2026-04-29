@@ -4,16 +4,16 @@
 
 **preflight** is an open-source custom agent that scans your project, recommends a tailored Copilot configuration, and scaffolds all the files interactively. It bundles 1 agent, 5 skills, and optional extensions. Once installed, you describe what you want — the agent scans your codebase, recommends a tailored setup, and scaffolds everything interactively.
 
-> **Current version: 1.6.0** — [changelog](plugin-changelog.json)
+> **Current version: 2.0.0** — [changelog](plugin-changelog.json)
 
-### What's New in v1.6.x
+### What's New in v2.x
 
 | Version | Highlights |
 |---|---|
+| **2.0.0** | Agent Guardrails — `onPreToolUse` policy system with YAML boundary files, preset + stack profiles, and `@preflight tune-boundaries` workflow; hub-extension refactor (single `preflight-hub/extension.mjs` replaces separate `session-logger` + `config-freshness` to fix hook overwrite bug) |
 | **1.6.0** | Self-hosted marketplace for version-tracked plugin updates, automated version sync workflow |
 | **1.5.2** | Scan results confirmation form, user confirmation checkpoints at every key decision, canonical `confirmedStack` data flow, "ask don't assume" principle propagated to generated files |
 | **1.5.1** | Parallelized Phase 1 scanning (3 batched turns instead of 11), sub-agent delegation for large repos |
-| **1.5.0** | Consolidated skill-extractor agent into preflight (single agent), removed dead scripts, cleaned up old JSON hook references to use SDK extensions |
 
 > ℹ️ **No external dependencies required.** Preflight uses Copilot's native tools (glob, read, search, create, edit) for scanning — no runtime installs, no API keys, no MCP servers. Just install the plugin and go.
 
@@ -108,8 +108,8 @@ You should see some or all of these (depending on what you confirmed):
 | `.github/instructions/*.instructions.md` | Language/path-specific rules |
 | `.github/agents/*.agent.md` | Custom agent profiles |
 | `.github/.preflight-state.json` | State tracking for idempotent re-runs |
-| `.github/extensions/config-freshness/extension.mjs` | Reminds you when config is stale |
-| `.github/extensions/session-logger/extension.mjs` | Captures tool usage for skill extraction |
+| `.github/extensions/preflight-hub/extension.mjs` | Hub extension (config freshness + session logger + guardrails, composed from your choices) |
+| `.github/preflight-boundaries.yaml` | Guardrail policy file — edit directly or tune with `@preflight tune-boundaries` |
 
 ---
 
@@ -120,6 +120,7 @@ You should see some or all of these (depending on what you confirmed):
 | `@preflight` | Re-scan and update your Copilot config | When your stack changes, you add frameworks, or config becomes stale |
 | `@preflight` (audit) | Validate existing config, detect stack drift, suggest improvements | When you already have config and want to check it |
 | `@preflight review last session` | Extract repeatable patterns from sessions into skills | After a few normal coding sessions — works from session store, no extension needed |
+| `@preflight tune-boundaries` | Tune guardrail policy from observed usage | After sessions with guardrails active — reads audit log and suggests rule adjustments |
 | `@code-reviewer` | Review code for bugs and security issues | Before pushing changes (if you created this agent during setup) |
 | `/instructions` | Verify active instruction files | Check what's loaded, diagnose unexpected suggestions |
 | `/agent` | Browse installed agents | Find agents by name or description |
@@ -200,6 +201,40 @@ See `skills/skill-extractor/SKILL.md` for the full workflow and pattern detectio
 
 ---
 
+## Agent Guardrails
+
+Preflight can install an **`onPreToolUse` boundary system** that intercepts tool calls before they run and enforces a policy you control.
+
+### How it works
+
+1. **Policy file** — `.github/preflight-boundaries.yaml` is generated during setup, composed from a preset (strict / balanced / permissive) plus stack-specific profiles (e.g. `git`, `nodejs`, `d365`).
+2. **Hub extension** — `preflight-hub/extension.mjs` reads the policy at session start and hooks `onPreToolUse` to allow, warn, ask, or block each tool call based on matching rules.
+3. **Audit log** — Every blocked or questioned call is appended to `.copilot/policy-decisions.jsonl`.
+4. **Tuning** — Run `@preflight tune-boundaries` to see which rules fired most and relax or tighten them.
+
+### Policy file example
+
+```yaml
+# <!-- managed-by: preflight -->
+preset: balanced
+mode: enforce          # enforce | audit (log-only)
+stack_defaults: true   # apply detected stack profiles
+rules:
+  blocked:
+    - pattern: "rm -rf /"
+      reason: "Destructive root deletion — use explicit paths"
+  ask:
+    - pattern: "git push --force"
+      reason: "Force push — confirm this is intentional"
+  allowed:
+    - pattern: "git status"
+# <!-- end-managed-by: preflight -->
+```
+
+Edit the file directly or let `@preflight tune-boundaries` do it based on your audit log.
+
+---
+
 ## Config Freshness
 
 Preflight can install a lightweight **config-freshness extension** that checks at each session start whether your configuration is stale. If your config is older than 30 days (configurable), you see a one-line reminder:
@@ -233,8 +268,10 @@ preflight/
 │   │   └── scan.ps1                # Windows fast-scan helper
 │   ├── preflight-deep-scan/        # On-demand deep code analysis
 │   │   └── SKILL.md
-│   ├── preflight-hooks/            # Extension templates (session-logger, config-freshness)
-│   │   └── SKILL.md
+│   ├── preflight-hooks/            # Hub extension template + guardrail reference docs
+│   │   ├── SKILL.md
+│   │   ├── presets/                # Guardrail baselines (strict, balanced, permissive)
+│   │   └── stack-profiles/         # Per-stack rule additions (d365, nodejs, dotnet, …)
 │   ├── skill-extractor/            # Session pattern analysis, skill lifecycle workflows
 │   │   └── SKILL.md
 │   └── preflight-authoring/        # Internal: guides authoring of plugin files
@@ -265,8 +302,9 @@ preflight/
 
 ## Roadmap
 
-- **v1.6.0 (current):** Self-hosted marketplace for version-tracked updates, automated version sync workflow, scan results confirmation, user confirmation checkpoints, canonical `confirmedStack` data flow, parallelized scanning, agent consolidation (single agent + 5 skills), community skill discovery, plugin install, presets, audit mode, session learning, native command education.
-- **v2 (planned):** MCP config scaffolding, team-sharing workflows, stack affinity mapping.
+- **v2.0.0 (current):** Agent Guardrails (`onPreToolUse` policy system, YAML boundary files, preset + stack profiles, `@preflight tune-boundaries`); hub-extension refactor (single `preflight-hub/extension.mjs`, fixes hook overwrite bug).
+- **v1.6.0:** Self-hosted marketplace for version-tracked updates, automated version sync workflow, scan results confirmation, user confirmation checkpoints, canonical `confirmedStack` data flow, parallelized scanning, agent consolidation (single agent + 5 skills), community skill discovery, plugin install, presets, audit mode, session learning, native command education.
+- **v3 (planned):** MCP config scaffolding, team-sharing workflows, stack affinity mapping.
 
 ## Contributing
 

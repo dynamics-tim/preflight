@@ -1,0 +1,26 @@
+preset: balanced
+mode: enforce
+tools:
+  blocked: []
+  ask: [powershell]
+  allowed: []
+commands:
+  blocked:
+    - { pattern: 'rm\s+-rf\s+/', reason: 'Recursive root delete' }
+    - { pattern: 'curl[^|]*\|\s*(sh|bash)', reason: 'Pipe-to-shell from network' }
+    - { pattern: 'git\s+push.*--force(?!-with-lease)', reason: 'Force push without lease' }
+    - { pattern: 'dd\s+if=', reason: 'Block device write' }
+    - { pattern: 'mkfs(\.\w+)?\b', reason: 'Filesystem format' }
+  warn:
+    - { pattern: 'sudo\b', reason: 'Privilege escalation — review carefully' }
+paths:
+  protected: ['.env', '.env.*', 'secrets/**', '**/credentials.*', '**/.git/**']
+  readOnly: []
+  sandbox: []
+network:
+  mode: open
+  allow: []
+  deny: []
+onViolation:
+  message: 'Blocked by preflight policy: ${reason}'
+  log: true

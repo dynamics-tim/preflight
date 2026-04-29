@@ -1,0 +1,24 @@
+preset: permissive
+mode: warn               # log violations, allow execution
+tools:
+  blocked: []
+  ask: []
+  allowed: []
+commands:
+  blocked:
+    - { pattern: 'rm\s+-rf\s+/(\s|$)', reason: 'Destructive root delete' }
+    - { pattern: 'mkfs(\.\w+)?\b', reason: 'Filesystem format' }
+  warn:
+    - { pattern: 'rm\s+-rf', reason: 'Recursive delete — allowed but logged' }
+    - { pattern: 'git\s+push.*--force', reason: 'Force push — allowed but logged' }
+paths:
+  protected: ['.env', 'secrets/**']
+  readOnly: []
+  sandbox: []
+network:
+  mode: open
+  allow: []
+  deny: []
+onViolation:
+  message: 'Logged by preflight policy: ${reason}'
+  log: true

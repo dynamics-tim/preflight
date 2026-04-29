@@ -1,0 +1,43 @@
+preset: strict
+mode: enforce
+tools:
+  blocked: []
+  ask: [bash, powershell, sh, cmd]
+  allowed: []
+commands:
+  blocked:
+    - { pattern: 'rm\s+-rf\s+(/|\$HOME|~)', reason: 'Destructive recursive delete' }
+    - { pattern: 'sudo\b', reason: 'Privilege escalation' }
+    - { pattern: 'curl[^|]*\|\s*(sh|bash|zsh)', reason: 'Pipe-to-shell from network' }
+    - { pattern: 'wget[^|]*\|\s*(sh|bash|zsh)', reason: 'Pipe-to-shell from network' }
+    - { pattern: 'eval\s+', reason: 'Dynamic code execution' }
+    - { pattern: 'dd\s+if=', reason: 'Block device write' }
+    - { pattern: 'mkfs(\.\w+)?\b', reason: 'Filesystem format' }
+    - { pattern: ':\(\)\{.*\}\s*;.*:', reason: 'Fork bomb' }
+    - { pattern: 'chmod\s+777', reason: 'World-writable permissions' }
+    - { pattern: 'history\s+-c', reason: 'History tampering' }
+    - { pattern: 'git\s+push.*--force(?!-with-lease)', reason: 'Force push without lease' }
+    - { pattern: 'git\s+(filter-branch|reset\s+--hard\s+origin)', reason: 'History rewrite on remote tracking' }
+  warn: []
+paths:
+  protected:
+    - '.env'
+    - '.env.*'
+    - 'secrets/**'
+    - '**/credentials.*'
+    - '**/.git/**'
+    - '**/*.pem'
+    - '**/*.key'
+    - '**/id_rsa*'
+    - '~/.ssh/**'
+    - '~/.aws/**'
+    - '~/.azure/**'
+  readOnly: []
+  sandbox: []
+network:
+  mode: allowlist
+  allow: [github.com, raw.githubusercontent.com, docs.github.com]
+  deny: []
+onViolation:
+  message: 'Blocked by preflight policy (strict): ${reason}'
+  log: true

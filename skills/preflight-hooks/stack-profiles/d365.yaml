@@ -1,0 +1,12 @@
+# Power Platform / Dynamics 365 dangerous commands
+commands:
+  blocked:
+    - { pattern: 'pac\s+admin\s+delete-environment', reason: 'D365 environment deletion' }
+    - { pattern: 'pac\s+admin\s+reset-environment',  reason: 'D365 environment reset (data loss)' }
+    - { pattern: 'pac\s+solution\s+delete',          reason: 'Solution deletion' }
+  warn:
+    - { pattern: 'pac\s+(plugin|pcf|pages)\s+push.*--prod', reason: 'Direct push to production environment' }
+paths:
+  protected:
+    - '**/cdspackagedependencies/**'
+    - '**/AppSourcePackage/**'
