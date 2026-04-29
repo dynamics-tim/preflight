@@ -209,29 +209,38 @@ Preflight can install an **`onPreToolUse` boundary system** that intercepts tool
 
 1. **Policy file** — `.github/preflight-boundaries.yaml` is generated during setup, composed from a preset (strict / balanced / permissive) plus stack-specific profiles (e.g. `git`, `nodejs`, `d365`).
 2. **Hub extension** — `preflight-hub/extension.mjs` reads the policy at session start and hooks `onPreToolUse` to allow, warn, ask, or block each tool call based on matching rules.
-3. **Audit log** — Every blocked or questioned call is appended to `.copilot/policy-decisions.jsonl`.
+3. **Audit log** — Every decision is appended to `.copilot/policy-decisions.jsonl`.
 4. **Tuning** — Run `@preflight tune-boundaries` to see which rules fired most and relax or tighten them.
 
-### Policy file example
+### Policy file overview
 
 ```yaml
-# <!-- managed-by: preflight -->
 preset: balanced
-mode: enforce          # enforce | audit (log-only)
-stack_defaults: true   # apply detected stack profiles
-rules:
+mode: enforce               # enforce | warn | dryrun
+
+tools:
+  blocked: []               # tools denied outright
+  ask: [powershell]         # tools requiring confirmation
+  allowed: []               # if non-empty: only these tools run freely
+
+commands:
   blocked:
-    - pattern: "rm -rf /"
-      reason: "Destructive root deletion — use explicit paths"
-  ask:
-    - pattern: "git push --force"
-      reason: "Force push — confirm this is intentional"
-  allowed:
-    - pattern: "git status"
-# <!-- end-managed-by: preflight -->
+    - { pattern: 'rm\s+-rf\s+/', reason: 'Recursive root delete' }
+    - { pattern: 'git\s+push.*--force(?!-with-lease)', reason: 'Force push without lease' }
+  warn:
+    - { pattern: 'sudo\b', reason: 'Privilege escalation — review carefully' }
+
+paths:
+  protected: ['.env', '.env.*', 'secrets/**', '**/.git/**']
+  sandbox: []               # if non-empty: writes only allowed inside
+
+network:
+  mode: open                # allowlist | denylist | open
 ```
 
 Edit the file directly or let `@preflight tune-boundaries` do it based on your audit log.
+
+> **📖 Full reference:** See [docs/guardrails.md](docs/guardrails.md) for the complete schema, evaluation order, presets comparison, stack profiles, audit log format, and troubleshooting.
 
 ---
 
