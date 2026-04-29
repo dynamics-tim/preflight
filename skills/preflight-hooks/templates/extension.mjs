@@ -15,9 +15,13 @@ const POLICY_LOG   = `${COPILOT_DIR}/policy-decisions.jsonl`;
 const ts = () => new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
 const readJSON = (p) => { try { return JSON.parse(readFileSync(p, "utf-8")); } catch { return null; } };
 const safeAppend = (p, line) => { try { mkdirSync(COPILOT_DIR, { recursive: true }); appendFileSync(p, line + "\n", "utf-8"); } catch {} };
+function parseToolArgs(input) {
+    const raw = input.toolArgs ?? {};
+    return typeof raw === "string" ? (() => { try { return JSON.parse(raw); } catch { return {}; } })() : raw;
+}
 function describeAttempt(input) {
-    const a = input.toolArgs ?? {};
-    const desc = a.description || a.command && String(a.command).slice(0, 80).replace(/\n/g, " ") || a.pattern || a.path || a.url || a.intent || "";
+    const a = parseToolArgs(input);
+    const desc = a.description || (a.command && String(a.command).slice(0, 80).replace(/\n/g, " ")) || a.pattern || a.path || a.url || a.intent || "";
     return desc ? `[${desc}] ` : "";
 }
 
@@ -122,8 +126,8 @@ async function onSessionStartComposed(input, invocation, sessionRef) {
 // ---------- onPreToolUse — guardrails ----------
 async function onPreToolUseGuard(input, invocation, sessionRef) {
     if (!policy) return;
-    const decision = evaluatePolicy(policy, input);
     const desc = describeAttempt(input);
+    const decision = evaluatePolicy(policy, input, desc);
     // decision: { kind: "allow"|"deny"|"ask", rule?: string, reason?: string }
     safeAppend(POLICY_LOG, JSON.stringify({ ts: ts(), tool: input.toolName, desc: desc.slice(1, -2) || undefined, ...decision }));
     if (policy.mode === "dryrun") return; // log decisions only — no enforcement
@@ -131,32 +135,32 @@ async function onPreToolUseGuard(input, invocation, sessionRef) {
         if (policy.mode === "warn") return; // warn-only: log but don't block
         return {
             permissionDecision: "deny",
-            permissionDecisionReason: `${desc}${decision.reason ?? "Blocked by preflight policy"} (rule: ${decision.rule ?? "n/a"}). Edit ${BOUNDARIES} or run @preflight tune-boundaries to adjust.`,
+            permissionDecisionReason: `${decision.reason ?? `${desc}Blocked by preflight policy`} (rule: ${decision.rule ?? "n/a"}). Edit ${BOUNDARIES} or run @preflight tune-boundaries to adjust.`,
         };
     }
     if (decision.kind === "ask" && policy.mode === "enforce") {
-        return { permissionDecision: "ask", permissionDecisionReason: `${desc}${decision.reason ?? "Confirmation required by preflight policy"}` };
+        return { permissionDecision: "ask", permissionDecisionReason: decision.reason ?? `${desc}Confirmation required by preflight policy` };
     }
 }
 
-function evaluatePolicy(p, input) {
+function evaluatePolicy(p, input, desc) {
     // Order: tools.blocked → commands.blocked → paths.protected → tools.ask → tools.allowed gate → default allow
     const t = input.toolName;
-    const args = input.toolArgs ?? {};
+    const args = parseToolArgs(input);
 
     // Tier 1: tool-level
-    if (p.tools?.blocked?.includes(t)) return { kind: "deny", rule: `tools.blocked:${t}`, reason: `Tool '${t}' is blocked` };
+    if (p.tools?.blocked?.includes(t)) return { kind: "deny", rule: `tools.blocked:${t}`, reason: `${desc}Tool '${t}' is blocked` };
 
     // Tier 2: command patterns (only for shell-like tools)
     if (["bash", "powershell", "sh", "cmd"].includes(t) && typeof args.command === "string") {
         for (const item of p.commands?.blocked ?? []) {
             if (new RegExp(item.pattern).test(args.command)) {
-                return { kind: "deny", rule: `commands.blocked:${item.pattern}`, reason: item.reason ?? "Matched blocked command pattern" };
+                return { kind: "deny", rule: `commands.blocked:${item.pattern}`, reason: `${desc}${item.reason ?? "Matched blocked command pattern"}` };
             }
         }
         for (const item of p.commands?.warn ?? []) {
             if (new RegExp(item.pattern).test(args.command)) {
-                safeAppend(POLICY_LOG, JSON.stringify({ ts: ts(), tool: t, kind: "warn", rule: `commands.warn:${item.pattern}`, reason: item.reason }));
+                safeAppend(POLICY_LOG, JSON.stringify({ ts: ts(), tool: t, kind: "warn", rule: `commands.warn:${item.pattern}`, reason: `${desc}${item.reason ?? "Matched warned command pattern"}` }));
             }
         }
     }
@@ -167,12 +171,12 @@ function evaluatePolicy(p, input) {
     if (isWriteTool && writePathArg) {
         for (const glob of p.paths?.protected ?? []) {
             if (matchGlob(glob, writePathArg)) {
-                return { kind: "deny", rule: `paths.protected:${glob}`, reason: `Write to '${writePathArg}' blocked by path policy` };
+                return { kind: "deny", rule: `paths.protected:${glob}`, reason: `${desc}Write to '${writePathArg}' blocked by path policy` };
             }
         }
         if ((p.paths?.sandbox ?? []).length > 0) {
             const inside = p.paths.sandbox.some((g) => matchGlob(g, writePathArg));
-            if (!inside) return { kind: "deny", rule: "paths.sandbox", reason: `Writes only allowed inside sandbox: ${p.paths.sandbox.join(", ")}` };
+            if (!inside) return { kind: "deny", rule: "paths.sandbox", reason: `${desc}Writes only allowed inside sandbox: ${p.paths.sandbox.join(", ")}` };
         }
     }
 
@@ -181,17 +185,17 @@ function evaluatePolicy(p, input) {
         const url = args.url ?? "";
         if (p.network?.mode === "allowlist") {
             const ok = (p.network.allow ?? []).some((host) => urlMatchesHost(url, host));
-            if (!ok) return { kind: "deny", rule: "network.allowlist", reason: `URL host not in allowlist: ${url}` };
+            if (!ok) return { kind: "deny", rule: "network.allowlist", reason: `${desc}URL host not in allowlist: ${url}` };
         } else if (p.network?.mode === "denylist") {
             const bad = (p.network.deny ?? []).some((host) => urlMatchesHost(url, host));
-            if (bad) return { kind: "deny", rule: "network.denylist", reason: `URL host in denylist: ${url}` };
+            if (bad) return { kind: "deny", rule: "network.denylist", reason: `${desc}URL host in denylist: ${url}` };
         }
     }
 
     // Tier 1 (continued): ask + allowlist gate
-    if (p.tools?.ask?.includes(t)) return { kind: "ask", rule: `tools.ask:${t}`, reason: `Tool '${t}' requires confirmation` };
+    if (p.tools?.ask?.includes(t)) return { kind: "ask", rule: `tools.ask:${t}`, reason: `${desc}Tool '${t}' requires confirmation` };
     if ((p.tools?.allowed ?? []).length > 0 && !p.tools.allowed.includes(t)) {
-        return { kind: "ask", rule: "tools.allowed", reason: `Tool '${t}' not in allowlist — confirm to proceed` };
+        return { kind: "ask", rule: "tools.allowed", reason: `${desc}Tool '${t}' not in allowlist — confirm to proceed` };
     }
     return { kind: "allow" };
 }
@@ -216,7 +220,7 @@ async function onPostToolUseLog(input) {
     if (!features.sessionLogger) return;
     try {
         const entry = { ts: ts(), tool: input.toolName };
-        const a = input.toolArgs;
+        const a = parseToolArgs(input);
         if (a) {
             if (a.path)        entry.path    = a.path;
             if (a.description) entry.desc    = a.description;
