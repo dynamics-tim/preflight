@@ -10,6 +10,7 @@ const ACTIVITY_LOG = `${COPILOT_DIR}/session-activity.jsonl`;
 const ACTIVITY_PREV = `${COPILOT_DIR}/session-activity.prev.jsonl`;
 const PENDING      = `${COPILOT_DIR}/pending-skill-review`;
 const POLICY_LOG   = `${COPILOT_DIR}/policy-decisions.jsonl`;
+const VERSION_CACHE = `${COPILOT_DIR}/version-cache.json`;
 
 // ---------- helpers ----------
 const ts = () => new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
@@ -23,6 +24,16 @@ function describeAttempt(input) {
     const a = parseToolArgs(input);
     const desc = a.description || (a.command && String(a.command).slice(0, 80).replace(/\n/g, " ")) || a.pattern || a.path || a.url || a.intent || "";
     return desc ? `[${desc}] ` : "";
+}
+
+function semverNewer(remote, local) {
+    const r = remote.split(".").map(Number);
+    const l = local.split(".").map(Number);
+    for (let i = 0; i < 3; i++) {
+        if ((r[i] || 0) > (l[i] || 0)) return true;
+        if ((r[i] || 0) < (l[i] || 0)) return false;
+    }
+    return false;
 }
 
 // Minimal YAML reader — only handles the documented schema. NOT a general parser.
@@ -120,6 +131,40 @@ async function onSessionStartComposed(input, invocation, sessionRef) {
     // 3. guardrails — log policy in effect
     if (features.guardrails && policy) {
         await sessionRef.log(`[preflight] Guardrails active: preset=${policy.preset} mode=${policy.mode}`, { level: "info" });
+    }
+    // 4. plugin version check
+    if (features.versionCheck) {
+        await checkPluginVersion(sessionRef);
+    }
+}
+
+// ---------- version check ----------
+async function checkPluginVersion(sessionRef) {
+    const local = state.pluginVersion;
+    if (!local) return;
+    try {
+        const cache = readJSON(VERSION_CACHE);
+        const cacheMaxAge = 24 * 60 * 60 * 1000;
+        if (cache && cache.checkedAt && (Date.now() - new Date(cache.checkedAt).getTime()) < cacheMaxAge) {
+            if (cache.remoteVersion && semverNewer(cache.remoteVersion, local)) {
+                await sessionRef.log(`[preflight] v${cache.remoteVersion} available (you have v${local}) — run: copilot plugin update preflight`, { level: "warning" });
+            }
+            return;
+        }
+        const res = await fetch("https://api.github.com/repos/dynamics-tim/preflight/releases/latest", {
+            headers: { "Accept": "application/vnd.github+json", "User-Agent": "preflight-hub" },
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const remote = (data.tag_name || "").replace(/^v/, "");
+        if (!remote) return;
+        mkdirSync(COPILOT_DIR, { recursive: true });
+        writeFileSync(VERSION_CACHE, JSON.stringify({ remoteVersion: remote, checkedAt: ts() }), "utf-8");
+        if (semverNewer(remote, local)) {
+            await sessionRef.log(`[preflight] v${remote} available (you have v${local}) — run: copilot plugin update preflight`, { level: "warning" });
+        }
+    } catch {
+        await sessionRef.log("[preflight] Could not check for plugin updates (network error)", { level: "info" });
     }
 }
 

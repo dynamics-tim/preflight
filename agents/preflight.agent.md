@@ -1010,7 +1010,7 @@ Use `ask_user` with a structured form:
 
 Default to **true** — this is a low-risk, high-value feature.
 
-If the user accepts: set `hubFeatures.configFreshness = true` in memory. Store the `reminderDaysThreshold` value (user-selected or 30). The hub file is written once in Phase 4 Group 4.
+If the user accepts: set `hubFeatures.configFreshness = true` and `hubFeatures.versionCheck = true` in memory. Store the `reminderDaysThreshold` value (user-selected or 30). The hub file is written once in Phase 4 Group 4.
 
 > 💡 **Manage with:** re-run `@preflight` anytime your stack changes; `@preflight audit` for a targeted drift check against your stored state.
 
@@ -1213,7 +1213,8 @@ After all files are created, create or update `.github/.preflight-state.json`:
   "hubFeatures": {
     "configFreshness": true,
     "sessionLogger": false,
-    "guardrails": true
+    "guardrails": true,
+    "versionCheck": true
   },
   "boundaries": {
     "preset": "balanced",
@@ -1233,7 +1234,7 @@ After all files are created, create or update `.github/.preflight-state.json`:
 
 - `pluginVersion` — always set to `CURRENT_PLUGIN_VERSION` ("2.0.0"). This is what future runs compare against to detect version drift and surface config improvements from newer plugin releases.
 - `confirmedStack` — the user-confirmed stack from step 2a-confirm (replaces the old `detectedStack`). Future audit runs compare against this to detect drift.
-- `hubFeatures` — which behaviors are active in the preflight-hub extension. Set only the flags for categories the user confirmed (others default to `false`). Include in state even if all are false, so future runs can read the state.
+- `hubFeatures` — which behaviors are active in the preflight-hub extension. Set only the flags for categories the user confirmed (others default to `false`). `versionCheck` defaults to `true` when config-freshness is accepted (it shares the same session-start concern). Include in state even if all are false, so future runs can read the state.
 - `boundaries` — populated only when guardrails was accepted (Cat 6). Omit if guardrails was declined.
 
 If `.preflight-state.json` already exists, update it (merge `managedFiles`, update `lastRun`, `confirmedStack`, `pluginVersion`, `hubFeatures`, `boundaries`). If the existing file uses the old `detectedStack` key, migrate it to `confirmedStack`.

@@ -23,6 +23,7 @@ that affected v1.5.x's separate session-logger and config-freshness extensions.
 | `hubFeatures.configFreshness` | composed in `onSessionStart`                                                | One-line reminder when config is older than `reminderDaysThreshold` |
 | `hubFeatures.sessionLogger`   | composed in `onSessionStart`, owns `onPostToolUse` + `onSessionEnd`         | Activity log for skill extraction |
 | `hubFeatures.guardrails`      | composed in `onSessionStart`, owns `onPreToolUse`                           | Boundary policy enforcement |
+| `hubFeatures.versionCheck`    | composed in `onSessionStart`                                                | Checks GitHub Releases API for newer plugin version (24h cache) |
 
 ## Files written to user projects
 
@@ -49,6 +50,7 @@ When scaffolding `.github/extensions/preflight-hub/extension.mjs` for a user pro
 - All file I/O wrapped in `try/catch` — the extension must never throw
 - Use `session.log()` for output, never `console.log()` (stdout is JSON-RPC)
 - Guardrails fail open: parse errors → `policy = null` → guardrails disabled with audit log
+- Version check uses 24h cache (`.copilot/version-cache.json`); on network error logs info-level message (non-silent)
 
 **Implementation notes:**
 

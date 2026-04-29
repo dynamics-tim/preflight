@@ -1,6 +1,18 @@
 {
   "_comment": "Maps each plugin release to config improvements. Used by the preflight agent to surface targeted upgrade actions when a version bump is detected between the installed plugin and the version stored in .preflight-state.json.",
   "changelog": {
+    "2.2.0": {
+      "summary": "Plugin version check at session start — the preflight-hub extension now compares the installed plugin version against the latest GitHub release and surfaces a one-liner when an update is available.",
+      "configImpacts": [
+        {
+          "type": "new_feature",
+          "title": "Automatic plugin update notification",
+          "description": "The preflight-hub extension's onSessionStart now checks the GitHub Releases API (with a 24-hour cache) and logs a warning when a newer plugin version is available. Gated by hubFeatures.versionCheck. Enabled by default when config-freshness is accepted.",
+          "affectedFiles": [".github/extensions/preflight-hub/extension.mjs", ".github/.preflight-state.json"],
+          "recommendation": "Re-run @preflight or manually add \"versionCheck\": true to hubFeatures in .preflight-state.json. The extension handles the rest — no additional setup needed."
+        }
+      ]
+    },
     "2.1.0": {
       "summary": "Guardrails UX improvement — deny/ask messages now include a description of the blocked attempt for instant context.",
       "configImpacts": [

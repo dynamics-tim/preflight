@@ -24,7 +24,8 @@
   "hubFeatures": {
     "configFreshness": true,
     "sessionLogger": true,
-    "guardrails": true
+    "guardrails": true,
+    "versionCheck": true
   },
   "managedFiles": [
     ".github/copilot-instructions.md",
