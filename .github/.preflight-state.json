@@ -1,13 +1,18 @@
 {
   "version": "1.0.0",
-  "pluginVersion": "1.4.0",
+  "pluginVersion": "1.5.2",
   "lastRun": "2025-07-17T00:00:00Z",
-  "detectedStack": {
-    "languages": ["markdown", "bash", "powershell", "json"],
-    "frameworks": ["copilot-plugin"],
+  "confirmedStack": {
+    "languages": ["markdown", "bash", "powershell", "json", "javascript"],
+    "framework": null,
     "packageManager": null,
     "testFramework": null,
-    "cicd": null
+    "cicd": null,
+    "linting": [],
+    "projectType": "single",
+    "targetWorkspaces": [],
+    "keyDirectories": ["agents/", "skills/", "copilot-architecture-class/", ".github/"],
+    "confirmedPatterns": []
   },
   "managedFiles": [
     ".github/copilot-instructions.md",

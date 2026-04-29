@@ -2,7 +2,17 @@
 
 > Scan any codebase. Get an optimized GitHub Copilot setup. Instantly.
 
-**preflight** is an open-source custom agent that scans your project, recommends a tailored Copilot configuration, and scaffolds all the files interactively. It bundles 2 agents, 3 skills, and optional hooks. Once installed, you describe what you want — the agent scans your codebase, recommends a tailored setup, and scaffolds everything interactively.
+**preflight** is an open-source custom agent that scans your project, recommends a tailored Copilot configuration, and scaffolds all the files interactively. It bundles 1 agent, 5 skills, and optional extensions. Once installed, you describe what you want — the agent scans your codebase, recommends a tailored setup, and scaffolds everything interactively.
+
+> **Current version: 1.5.2** — [changelog](plugin-changelog.json)
+
+### What's New in v1.5.x
+
+| Version | Highlights |
+|---|---|
+| **1.5.2** | Scan results confirmation form, user confirmation checkpoints at every key decision, canonical `confirmedStack` data flow, "ask don't assume" principle propagated to generated files |
+| **1.5.1** | Parallelized Phase 1 scanning (3 batched turns instead of 11), sub-agent delegation for large repos |
+| **1.5.0** | Consolidated skill-extractor agent into preflight (single agent), removed dead scripts, cleaned up old JSON hook references to use SDK extensions |
 
 > ℹ️ **No external dependencies required.** Preflight uses Copilot's native tools (glob, read, search, create, edit) for scanning — no runtime installs, no API keys, no MCP servers. Just install the plugin and go.
 
@@ -52,7 +62,7 @@ Preflight runs four phases automatically:
 
 1. **Scans** your codebase — detects tech stack, frameworks, folder structure, existing Copilot config
 2. **Reports** findings and matches your stack to community skills from `github/awesome-copilot` — you pick which to install
-3. **Recommends** a tailored setup — instructions, path-specific rules, custom agents, hooks — you confirm each with native command hints included
+3. **Recommends** a tailored setup — instructions, path-specific rules, custom agents, extensions — you confirm each with native command hints included
 4. **Scaffolds** all confirmed files — validates each after creation, safe to re-run
 
 ### Presets
@@ -61,7 +71,7 @@ Power users can skip the interactive flow:
 
 ```
 @preflight full      # Pre-selects everything, one confirmation
-@preflight minimal   # Only repo-wide + path instructions, no hooks/agents
+@preflight minimal   # Only repo-wide + path instructions, no extensions/agents
 ```
 
 ---
@@ -93,14 +103,14 @@ You should see some or all of these (depending on what you confirmed):
 |---------|-------------|-------------|
 | `@preflight` | Re-scan and update your Copilot config | When your stack changes, you add frameworks, or config becomes stale |
 | `@preflight` (audit) | Validate existing config, detect stack drift, suggest improvements | When you already have config and want to check it |
-| `@preflight review last session` | Extract repeatable patterns from sessions into skills | After a few normal coding sessions — works from session store, no hook needed |
+| `@preflight review last session` | Extract repeatable patterns from sessions into skills | After a few normal coding sessions — works from session store, no extension needed |
 | `@code-reviewer` | Review code for bugs and security issues | Before pushing changes (if you created this agent during setup) |
 | `/instructions` | Verify active instruction files | Check what's loaded, diagnose unexpected suggestions |
 | `/agent` | Browse installed agents | Find agents by name or description |
 | `/skills list` | See active skills | Verify installed skills loaded correctly |
 | `gh skill install <path>` | Install a community skill | Add skills from `github/awesome-copilot` |
 
-> **How invocation works:** Agents are invoked with `@name` in Copilot chat. Instructions and skills load automatically — no manual invocation needed. The config freshness hook runs silently at session start and reminds you when it's time to re-run.
+> **How invocation works:** Agents are invoked with `@name` in Copilot chat. Instructions and skills load automatically — no manual invocation needed. The config freshness extension runs silently at session start and reminds you when it's time to re-run.
 
 ---
 
@@ -112,7 +122,7 @@ You should see some or all of these (depending on what you confirmed):
 |---|---|
 | Full scan & setup | *"Scan my project and set up Copilot with the recommended configuration."* |
 | Full preset (no questions) | *"@preflight full"* |
-| Minimal preset | *"@preflight minimal — just the basics, no hooks or agents."* |
+| Minimal preset | *"@preflight minimal — just the basics, no extensions or agents."* |
 | Specific project | *"Set up Copilot for this React + Express monorepo."* |
 
 ### Audit & maintenance
@@ -137,12 +147,12 @@ You should see some or all of these (depending on what you confirmed):
 
 ## Session Learning
 
-The session store already captures your complete Copilot session history automatically — `@preflight` can analyze it immediately with no setup. The session-logger hook is optional enrichment that adds per-command detail for power users.
+The session store already captures your complete Copilot session history automatically — `@preflight` can analyze it immediately with no setup. The session-logger extension is optional enrichment that adds per-command detail for power users.
 
 ### How it works
 
 1. **Session store always available** — `@preflight` reads session history directly from the built-in SQL store
-2. **Hook adds richer data** — An optional `postToolUse` hook appends tool call details to `.copilot/session-activity.jsonl`
+2. **Extension adds richer data** — An optional `postToolUse` extension callback appends tool call details to `.copilot/session-activity.jsonl`
 3. **Agent analyzes patterns** — `@preflight` identifies repeated multi-step workflows across sessions
 4. **You confirm & save** — Detected patterns are presented for approval, then generated as `.github/skills/` definitions
 5. **Evaluate & improve** — Existing skills are checked against session activity patterns for trigger accuracy, workflow drift, and file pattern staleness
@@ -151,7 +161,7 @@ The session store already captures your complete Copilot session history automat
 ### Quick setup
 
 ```bash
-# 1. Run preflight (session-logger hook is optional — skill extraction works without it)
+# 1. Run preflight (session-logger extension is optional — skill extraction works without it)
 @preflight
 
 # 2. Work normally for a few sessions
@@ -168,7 +178,7 @@ The session store already captures your complete Copilot session history automat
 @preflight clean up skills
 ```
 
-> **Note:** The session store is always available — no hook needed to start. Install the session-logger hook if you want richer per-command data (tool args, shell command text). Either way, `@preflight` handles skill extraction immediately.
+> **Note:** The session store is always available — no extension needed to start. Install the session-logger extension if you want richer per-command data (tool args, shell command text). Either way, `@preflight` handles skill extraction immediately.
 
 See `skills/skill-extractor/SKILL.md` for the full workflow and pattern detection heuristics.
 
@@ -176,7 +186,7 @@ See `skills/skill-extractor/SKILL.md` for the full workflow and pattern detectio
 
 ## Config Freshness
 
-Preflight can install a lightweight **config-freshness hook** that checks at each session start whether your configuration is stale. If your config is older than 30 days (configurable), you see a one-line reminder:
+Preflight can install a lightweight **config-freshness extension** that checks at each session start whether your configuration is stale. If your config is older than 30 days (configurable), you see a one-line reminder:
 
 ```
 [preflight] Config is 34 days old — run @preflight to update.
@@ -189,8 +199,6 @@ Non-blocking, opt-in (offered during setup with `default: true`), and benefits t
 ## How It Works
 
 The core is a single custom agent (`preflight.agent.md`) that owns the entire workflow. It uses Copilot's native tools for scanning — no external dependencies required.
-
-See [PLAN.md](PLAN.md) for the full architecture and design decisions.
 
 ## Project Structure
 
@@ -212,7 +220,7 @@ preflight/
 │   │   └── SKILL.md
 │   └── preflight-authoring/        # Internal: guides authoring of plugin files
 │       └── SKILL.md
-├── PLAN.md                         # Architecture & implementation plan
+├── copilot-architecture-class/     # Educational deep-dive on Copilot extensibility
 ├── LICENSE                         # MIT
 └── README.md                       # This file
 ```
@@ -220,7 +228,7 @@ preflight/
 ## Design Principles
 
 - **Agent-first** — The workflow lives in the agent prompt, not scattered across skills
-- **Interactive** — Recommends but always asks; never force-generates
+- **Interactive** — Recommends but always asks; confirms scan results and key decisions before generating content
 - **Idempotent** — Safe to re-run; tracks managed files via state + markers
 - **Cross-platform** — Native Copilot tools work everywhere; helper scripts ship as bash + PowerShell
 - **Open-source & generic** — Works for any tech stack, any team
@@ -238,7 +246,7 @@ preflight/
 
 ## Roadmap
 
-- **v1 (current):** Agent + scan + community skill discovery + plugin install + presets + audit mode + session learning + native command education.
+- **v1.5.2 (current):** Scan results confirmation, user confirmation checkpoints, canonical `confirmedStack` data flow, parallelized scanning, agent consolidation (single agent + 5 skills), community skill discovery, plugin install, presets, audit mode, session learning, native command education.
 - **v2 (planned):** MCP config scaffolding, team-sharing workflows.
 - **v3:** Stack affinity mapping, marketplace integration.
 

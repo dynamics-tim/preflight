@@ -10,5 +10,11 @@
   "repository": "https://github.com/dynamics-tim/preflight",
   "keywords": ["copilot", "setup", "scaffolding", "instructions", "agents", "configuration"],
   "agents": "agents/",
-  "skills": ["skills/preflight-scan/", "skills/preflight-deep-scan/", "skills/skill-extractor/", "skills/preflight-authoring/", "skills/preflight-hooks/"]
+  "skills": [
+    "skills/preflight-scan/",
+    "skills/preflight-deep-scan/",
+    "skills/skill-extractor/",
+    "skills/preflight-authoring/",
+    "skills/preflight-hooks/"
+  ]
 }

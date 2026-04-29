@@ -66,7 +66,7 @@ flowchart TD
     Hooks -.->|"intercept & control"| Agents
 
     subgraph Plugins["Layer 5: Packaging & Distribution"]
-        PluginBundle["Plugin Bundle<br/>skills + hooks + agents<br/>+ MCP configs"]
+        PluginBundle["Plugin Bundle<br/>skills + extensions + agents<br/>+ MCP configs"]
     end
 
     Plugins -.->|"provides"| Skills
@@ -122,7 +122,7 @@ The **main agent** orchestrates the session. It can delegate work to **sub-agent
 
 ### Layer 5: Packaging & Distribution
 
-**Plugins** bundle skills, hooks, agents, and MCP configurations into a single distributable unit. They let teams and the community share complete Copilot extensions — a plugin might include a custom agent for Kubernetes, a skill for Helm chart generation, hooks for security scanning, and an MCP config for the cluster API, all in one package.
+**Plugins** bundle skills, extensions, agents, and MCP configurations into a single distributable unit. They let teams and the community share complete Copilot extensions — a plugin might include a custom agent for Kubernetes, a skill for Helm chart generation, extensions for security scanning, and an MCP config for the cluster API, all in one package.
 
 ---
 

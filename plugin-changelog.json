@@ -96,15 +96,15 @@
         },
         {
           "type": "improvement",
-          "description": "Session learning (Category 5) now leads with the zero-setup path: @skill-extractor works immediately from the session store with no hook required. The session-logger hook is now presented as optional enrichment, not a prerequisite.",
-          "affectedFiles": [".github/hooks/session-logger.json"],
-          "recommendation": "Try @skill-extractor without installing the hook — the session store is always available. Install the hook only if you want richer per-command data."
+          "description": "Session learning (Category 5) now leads with the zero-setup path: @preflight handles skill extraction immediately from the session store with no extension required. The session-logger extension is presented as optional enrichment, not a prerequisite.",
+          "affectedFiles": [".github/extensions/session-logger/extension.mjs"],
+          "recommendation": "Try @preflight review last session without installing the extension — the session store is always available. Install the extension only if you want richer per-command data."
         },
         {
           "type": "improvement",
-          "description": "Hook templates (session-logger and config-freshness) are now maintained in the preflight-hooks skill rather than inlined in the agent — making them easier to update and reducing agent context size.",
-          "affectedFiles": [".github/hooks/session-logger.json", ".github/hooks/config-freshness.json"],
-          "recommendation": "No action needed. Reinstall hooks via @preflight if you want the latest template."
+          "description": "Extension templates (session-logger and config-freshness) are now maintained in the preflight-hooks skill rather than inlined in the agent — making them easier to update and reducing agent context size.",
+          "affectedFiles": [".github/extensions/session-logger/extension.mjs", ".github/extensions/config-freshness/extension.mjs"],
+          "recommendation": "No action needed. Reinstall extensions via @preflight if you want the latest template."
         },
         {
           "type": "breaking_change",
@@ -120,13 +120,13 @@
       ]
     },
     "1.2.4":{
-      "summary": "Simplified session-logger hook — postToolUse now captures only phase boundaries (report_intent) and shell commands (powershell), reducing invocations by ~80% while preserving the two highest-signal data points for skill extraction. Removed dead log-tool-call helper scripts that referenced a non-existent env-var hook interface.",
+      "summary": "Simplified session-logger extension — postToolUse now captures only phase boundaries (report_intent) and shell commands (powershell), reducing invocations by ~80% while preserving the two highest-signal data points for skill extraction.",
       "configImpacts": [
         {
           "type": "improvement",
           "description": "Session-logger postToolUse simplified to capture only report_intent (phase boundaries) and powershell (shell commands). Previously logged every tool call — view, read, grep, glob, edit, ask_user, etc. — producing hundreds of low-signal entries per session. The session store (SQL) serves as the primary source for file edit patterns, co-edit clusters, and cross-session repetition. The sessionEnd skill-review threshold is also lowered from 10 to 5 lines to account for reduced log volume.",
-          "affectedFiles": [".github/hooks/session-logger.json"],
-          "recommendation": "Reinstall the session-logger hook via @preflight to get the simplified postToolUse. Existing JSONL logs remain readable — the skill-extractor still works with the old format."
+          "affectedFiles": [".github/extensions/session-logger/extension.mjs"],
+          "recommendation": "Reinstall the session-logger extension via @preflight to get the simplified postToolUse. Existing JSONL logs remain readable."
         }
       ]
     },
@@ -146,15 +146,15 @@
       "configImpacts": [
         {
           "type": "breaking_change",
-          "description": "The 2nd sessionEnd step in session-logger.json (skill-usage.json aggregation) has been removed. The step relied on COPILOT_SKILL_NAME and postToolUse skill context, neither of which exist in the hook runtime — resulting in skill-usage.json always being empty.",
-          "affectedFiles": [".github/hooks/session-logger.json"],
-          "recommendation": "Reinstall the session-logger hook to remove the defunct skill-usage aggregation step. Existing session logs are unaffected."
+          "description": "The 2nd sessionEnd step in the session-logger (skill-usage.json aggregation) has been removed. The step relied on COPILOT_SKILL_NAME and postToolUse skill context, neither of which exist in the extension runtime — resulting in skill-usage.json always being empty.",
+          "affectedFiles": [".github/extensions/session-logger/extension.mjs"],
+          "recommendation": "Reinstall the session-logger extension to remove the defunct skill-usage aggregation step. Existing session logs are unaffected."
         },
         {
           "type": "improvement",
           "description": "Skill-extractor evaluation and cleanup workflows now use session activity pattern matching and file pattern validation instead of skill-usage.json metrics — producing accurate results without the broken dependency.",
           "affectedFiles": [],
-          "recommendation": "No action needed. Re-run @skill-extractor normally — it will use the improved pattern-based approach automatically."
+          "recommendation": "No action needed. Re-run @preflight normally — it will use the improved pattern-based approach automatically."
         }
       ]
     },
@@ -163,15 +163,15 @@
       "configImpacts": [
         {
           "type": "improvement",
-          "description": "Session logger hook now captures `intent` from report_intent and `pattern` from grep/glob — enabling phase-based session analysis.",
-          "affectedFiles": [".github/hooks/session-logger.json"],
-          "recommendation": "Reinstall the session-logger hook to start capturing intent and pattern data. Existing logs still work but lack these fields."
+          "description": "Session logger extension now captures `intent` from report_intent and `pattern` from grep/glob — enabling phase-based session analysis.",
+          "affectedFiles": [".github/extensions/session-logger/extension.mjs"],
+          "recommendation": "Reinstall the session-logger extension to start capturing intent and pattern data. Existing logs still work but lack these fields."
         },
         {
           "type": "improvement",
           "description": "Skill extractor now splits sessions into named phases via report_intent entries and detects phase-level workflow patterns (Explore → Plan → Implement → Release).",
           "affectedFiles": [],
-          "recommendation": "Run @skill-extractor after a few sessions to benefit from improved phase-aware pattern detection."
+          "recommendation": "Run @preflight review last session after a few sessions to benefit from improved phase-aware pattern detection."
         }
       ]
     },
@@ -187,18 +187,18 @@
       ]
     },
     "1.1.0": {
-      "summary": "Added session learning hooks, config freshness checker, and audit mode with stack-drift detection.",
+      "summary": "Added session learning extensions, config freshness checker, and audit mode with stack-drift detection.",
       "configImpacts": [
         {
           "type": "new_feature",
-          "description": "Session-logger hook — tracks tool usage per session (<1ms overhead). Enables @skill-extractor to analyze patterns and auto-generate reusable skills after 3-5 sessions.",
-          "affectedFiles": [".github/hooks/session-logger.json"],
-          "recommendation": "Install if you want @skill-extractor to extract workflow patterns into reusable skills over time."
+          "description": "Session-logger extension — tracks tool usage per session (<1ms overhead). Enables @preflight to analyze patterns and auto-generate reusable skills after 3-5 sessions.",
+          "affectedFiles": [".github/extensions/session-logger/extension.mjs"],
+          "recommendation": "Install if you want @preflight to extract workflow patterns into reusable skills over time."
         },
         {
           "type": "new_feature",
-          "description": "Config-freshness hook — shows a one-line reminder at session start when Copilot config is stale (configurable threshold, default 30 days).",
-          "affectedFiles": [".github/hooks/config-freshness.json"],
+          "description": "Config-freshness extension — shows a one-line reminder at session start when Copilot config is stale (configurable threshold, default 30 days).",
+          "affectedFiles": [".github/extensions/config-freshness/extension.mjs"],
           "recommendation": "Install to ensure your team is reminded to re-run @preflight when the config ages."
         },
         {

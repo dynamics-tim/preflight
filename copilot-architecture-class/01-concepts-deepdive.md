@@ -184,8 +184,6 @@ When the user needs to create, modify, or troubleshoot database migrations.
 - Always run validation before considering the migration complete
 - If the migration fails, check `prisma/migrations` for conflicts
 
-## Helper Script
-Run `./scripts/check-migration-status.sh` to see pending migrations.
 ```
 
 ### CLI Commands
@@ -837,8 +835,9 @@ These concepts are designed to work together. Real-world configurations often co
 ├── agents/
 │   ├── security-reviewer.agent.md   ← Security review persona
 │   └── docs-writer.agent.md         ← Documentation specialist
-└── hooks/
-    └── guardrails.json              ← Safety and audit hooks
+└── extensions/
+    └── guardrails/
+        └── extension.mjs            ← Safety and audit extensions
 ```
 
 ### Flow of a Typical Session

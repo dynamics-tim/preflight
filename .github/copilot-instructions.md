@@ -2,7 +2,7 @@
 
 # preflight — Copilot Plugin Project
 
-This is an open-source GitHub Copilot plugin that scans any codebase and interactively scaffolds an optimized Copilot configuration (instructions, path-specific rules, custom agents, session-learning hooks). The project contains no compiled code or package manager — it is entirely Markdown, shell scripts (Bash + PowerShell), and JSON.
+This is an open-source GitHub Copilot plugin that scans any codebase and interactively scaffolds an optimized Copilot configuration (instructions, path-specific rules, custom agents, session-learning extensions). The project contains no compiled code or package manager — it is Markdown, shell scripts (Bash + PowerShell), JavaScript (ES modules for extensions), and JSON.
 
 ## Architecture
 
@@ -12,7 +12,9 @@ agents/
 skills/
   preflight-scan/               — Optional fast-scan helper (scan.sh + scan.ps1)
   preflight-deep-scan/          — On-demand code pattern analysis skill
-  skill-extractor/              — Session pattern heuristics, evaluation heuristics, and skill lifecycle workflows
+  preflight-hooks/              — Extension templates (session-logger, config-freshness)
+  preflight-authoring/          — Internal: guides authoring of plugin files
+  skill-extractor/              — Session pattern heuristics, evaluation heuristics + lifecycle workflows
 copilot-architecture-class/     — Educational materials on Copilot extensibility
 plugin.json                     — Plugin manifest for `copilot plugin install`
 ```
@@ -20,7 +22,7 @@ plugin.json                     — Plugin manifest for `copilot plugin install`
 ## Key Design Principles
 
 - **Agent-first:** The agent IS the workflow. Skills are optional context injections, not orchestration steps.
-- **Two-part skill lifecycle:** Extensions can't invoke LLMs — so extensions log data (fast, <1ms) and the preflight agent analyzes patterns (intelligent, interactive). The sessionEnd → sessionStart handoff uses a marker file. The skill-extractor skill provides heuristics and workflows for the full lifecycle: extract → evaluate → improve → clean up.
+- **Two-part skill lifecycle:** Extensions can't invoke LLMs — so extensions log data (fast, <1ms) and the preflight agent analyzes patterns (intelligent, interactive). The sessionEnd → sessionStart handoff uses a marker file. The skill-extractor skill provides heuristics and reference data; preflight owns the full lifecycle: extract → evaluate → improve → clean up.
 - **Native tools preferred:** The agent uses Copilot's native tools (glob, read, search, create, edit) for scanning — scripts are optional accelerators.
 
 ## lean-ctx Tool Preference
