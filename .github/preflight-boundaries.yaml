@@ -9,7 +9,7 @@ mode: enforce                 # enforce | warn | dryrun
 
 tools:
   blocked: []                 # tools denied outright
-  ask: [powershell]           # tools that require confirmation each call
+  ask: []           # tools that require confirmation each call
   allowed: []                 # if non-empty: only these tools run without confirmation
 
 commands:
