@@ -151,12 +151,12 @@ async function checkPluginVersion(sessionRef) {
             }
             return;
         }
-        const res = await fetch("https://api.github.com/repos/dynamics-tim/preflight/releases/latest", {
-            headers: { "Accept": "application/vnd.github+json", "User-Agent": "preflight-hub" },
+        const res = await fetch("https://raw.githubusercontent.com/dynamics-tim/preflight/main/plugin.json", {
+            headers: { "User-Agent": "preflight-hub" },
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
-        const remote = (data.tag_name || "").replace(/^v/, "");
+        const remote = (data.version || "").replace(/^v/, "");
         if (!remote) return;
         mkdirSync(COPILOT_DIR, { recursive: true });
         writeFileSync(VERSION_CACHE, JSON.stringify({ remoteVersion: remote, checkedAt: ts() }), "utf-8");

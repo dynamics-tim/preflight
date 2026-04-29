@@ -7,7 +7,7 @@
         {
           "type": "new_feature",
           "title": "Automatic plugin update notification",
-          "description": "The preflight-hub extension's onSessionStart now checks the GitHub Releases API (with a 24-hour cache) and logs a warning when a newer plugin version is available. Gated by hubFeatures.versionCheck. Enabled by default when config-freshness is accepted.",
+          "description": "The preflight-hub extension's onSessionStart now fetches plugin.json from the main branch on GitHub (with a 24-hour cache) and logs a warning when a newer plugin version is available. Gated by hubFeatures.versionCheck. Enabled by default when config-freshness is accepted.",
           "affectedFiles": [".github/extensions/preflight-hub/extension.mjs", ".github/.preflight-state.json"],
           "recommendation": "Re-run @preflight or manually add \"versionCheck\": true to hubFeatures in .preflight-state.json. The extension handles the rest — no additional setup needed."
         }

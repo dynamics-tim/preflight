@@ -50,7 +50,7 @@ When scaffolding `.github/extensions/preflight-hub/extension.mjs` for a user pro
 - All file I/O wrapped in `try/catch` — the extension must never throw
 - Use `session.log()` for output, never `console.log()` (stdout is JSON-RPC)
 - Guardrails fail open: parse errors → `policy = null` → guardrails disabled with audit log
-- Version check uses 24h cache (`.copilot/version-cache.json`); on network error logs info-level message (non-silent)
+- Version check uses 24h cache (`.copilot/version-cache.json`); fetches `plugin.json` from `raw.githubusercontent.com`; on network error logs info-level message (non-silent)
 
 **Implementation notes:**
 
