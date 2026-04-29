@@ -93,7 +93,7 @@ You should see some or all of these (depending on what you confirmed):
 |---------|-------------|-------------|
 | `@preflight` | Re-scan and update your Copilot config | When your stack changes, you add frameworks, or config becomes stale |
 | `@preflight` (audit) | Validate existing config, detect stack drift, suggest improvements | When you already have config and want to check it |
-| `@skill-extractor` | Extract repeatable patterns from sessions into skills | After a few normal coding sessions — works from session store, no hook needed |
+| `@preflight review last session` | Extract repeatable patterns from sessions into skills | After a few normal coding sessions — works from session store, no hook needed |
 | `@code-reviewer` | Review code for bugs and security issues | Before pushing changes (if you created this agent during setup) |
 | `/instructions` | Verify active instruction files | Check what's loaded, diagnose unexpected suggestions |
 | `/agent` | Browse installed agents | Find agents by name or description |
@@ -128,22 +128,22 @@ You should see some or all of these (depending on what you confirmed):
 
 | Goal | Prompt |
 |---|---|
-| Review session patterns | *"@skill-extractor review last session"* |
-| Extract skills | *"@skill-extractor — extract repeatable patterns from my recent sessions into reusable skills."* |
-| Evaluate existing skills | *"@skill-extractor evaluate skills — are my current skills still accurate?"* |
-| Clean up stale skills | *"@skill-extractor clean up skills — archive anything unused."* |
+| Review session patterns | *"@preflight review last session"* |
+| Extract skills | *"@preflight — extract repeatable patterns from my recent sessions into reusable skills."* |
+| Evaluate existing skills | *"@preflight evaluate skills — are my current skills still accurate?"* |
+| Clean up stale skills | *"@preflight clean up skills — archive anything unused."* |
 
 ---
 
 ## Session Learning
 
-The session store already captures your complete Copilot session history automatically — `@skill-extractor` can analyze it immediately with no setup. The session-logger hook is optional enrichment that adds per-command detail for power users.
+The session store already captures your complete Copilot session history automatically — `@preflight` can analyze it immediately with no setup. The session-logger hook is optional enrichment that adds per-command detail for power users.
 
 ### How it works
 
-1. **Session store always available** — `@skill-extractor` reads session history directly from the built-in SQL store
+1. **Session store always available** — `@preflight` reads session history directly from the built-in SQL store
 2. **Hook adds richer data** — An optional `postToolUse` hook appends tool call details to `.copilot/session-activity.jsonl`
-3. **Agent analyzes patterns** — `@skill-extractor` identifies repeated multi-step workflows across sessions
+3. **Agent analyzes patterns** — `@preflight` identifies repeated multi-step workflows across sessions
 4. **You confirm & save** — Detected patterns are presented for approval, then generated as `.github/skills/` definitions
 5. **Evaluate & improve** — Existing skills are checked against session activity patterns for trigger accuracy, workflow drift, and file pattern staleness
 6. **Clean up** — Unused or stale skills are archived to keep your configuration lean
@@ -151,24 +151,24 @@ The session store already captures your complete Copilot session history automat
 ### Quick setup
 
 ```bash
-# 1. Run preflight (session-logger hook is optional — @skill-extractor works without it)
+# 1. Run preflight (session-logger hook is optional — skill extraction works without it)
 @preflight
 
 # 2. Work normally for a few sessions
 
 # 3. Extract patterns
-@skill-extractor review last session
+@preflight review last session
 ```
 
 ```bash
 # Evaluate and improve existing skills
-@skill-extractor evaluate skills
+@preflight evaluate skills
 
 # Clean up stale or unused skills
-@skill-extractor clean up skills
+@preflight clean up skills
 ```
 
-> **Note:** The session store is always available — no hook needed to start. Install the session-logger hook if you want richer per-command data (tool args, shell command text). Either way, `@skill-extractor` works immediately.
+> **Note:** The session store is always available — no hook needed to start. Install the session-logger hook if you want richer per-command data (tool args, shell command text). Either way, `@preflight` handles skill extraction immediately.
 
 See `skills/skill-extractor/SKILL.md` for the full workflow and pattern detection heuristics.
 
@@ -198,8 +198,7 @@ See [PLAN.md](PLAN.md) for the full architecture and design decisions.
 preflight/
 ├── plugin.json                     # Plugin manifest for one-command install
 ├── agents/
-│   ├── preflight.agent.md          # The core agent (entire workflow)
-│   └── skill-extractor.agent.md    # Extracts reusable skills from session patterns
+│   └── preflight.agent.md          # The core agent (entire workflow)
 ├── skills/
 │   ├── preflight-scan/             # Optional scan helper + community skill mapping
 │   │   ├── SKILL.md
@@ -209,10 +208,8 @@ preflight/
 │   │   └── SKILL.md
 │   ├── preflight-hooks/            # Extension templates (session-logger, config-freshness)
 │   │   └── SKILL.md
-│   ├── skill-extractor/            # Session pattern analysis & skill generation
-│   │   ├── SKILL.md
-│   │   ├── log-tool-call.sh        # Rich logging helper (optional upgrade)
-│   │   └── log-tool-call.ps1       # Rich logging helper (Windows)
+│   ├── skill-extractor/            # Session pattern analysis, skill lifecycle workflows
+│   │   └── SKILL.md
 │   └── preflight-authoring/        # Internal: guides authoring of plugin files
 │       └── SKILL.md
 ├── PLAN.md                         # Architecture & implementation plan

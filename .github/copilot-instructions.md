@@ -9,11 +9,10 @@ This is an open-source GitHub Copilot plugin that scans any codebase and interac
 ```
 agents/
   preflight.agent.md            — The core agent prompt; owns the entire workflow
-  skill-extractor.agent.md      — Analyzes session logs, generates reusable skills
 skills/
   preflight-scan/               — Optional fast-scan helper (scan.sh + scan.ps1)
   preflight-deep-scan/          — On-demand code pattern analysis skill
-  skill-extractor/              — Session pattern heuristics, evaluation heuristics + rich logging scripts
+  skill-extractor/              — Session pattern heuristics, evaluation heuristics, and skill lifecycle workflows
 copilot-architecture-class/     — Educational materials on Copilot extensibility
 plugin.json                     — Plugin manifest for `copilot plugin install`
 ```
@@ -21,7 +20,7 @@ plugin.json                     — Plugin manifest for `copilot plugin install`
 ## Key Design Principles
 
 - **Agent-first:** The agent IS the workflow. Skills are optional context injections, not orchestration steps.
-- **Two-part skill lifecycle:** Hooks can't invoke LLMs — so hooks log data (fast, <1ms) and agents analyze patterns (intelligent, interactive). The sessionEnd → sessionStart handoff uses a marker file. The skill-extractor manages the full lifecycle: extract → evaluate → improve → clean up.
+- **Two-part skill lifecycle:** Extensions can't invoke LLMs — so extensions log data (fast, <1ms) and the preflight agent analyzes patterns (intelligent, interactive). The sessionEnd → sessionStart handoff uses a marker file. The skill-extractor skill provides heuristics and workflows for the full lifecycle: extract → evaluate → improve → clean up.
 - **Native tools preferred:** The agent uses Copilot's native tools (glob, read, search, create, edit) for scanning — scripts are optional accelerators.
 
 ## lean-ctx Tool Preference

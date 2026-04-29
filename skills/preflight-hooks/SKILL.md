@@ -28,7 +28,7 @@ Selective logger for skill extraction. Captures only phase boundaries (`report_i
 and all tool calls — the highest-signal events for pattern detection.
 Full tool-call history is available in the session store (SQL) without any extension.
 
-**When to use:** The user wants `@skill-extractor` to have richer tool-sequence data
+**When to use:** The user wants richer tool-sequence data for skill extraction
 (command args, phase boundaries) beyond what the session store provides. Default: opt-in.
 
 ```js
@@ -56,7 +56,7 @@ const session = await joinSession({
                 );
                 if (existsSync(PENDING)) {
                     await session.log(
-                        '[skill-extractor] Previous session has unreviewed patterns — say "review last session" to extract skills, or "evaluate skills" to improve existing ones.',
+                        '[preflight] Previous session has unreviewed patterns — say "review last session" to extract skills, or "evaluate skills" to improve existing ones.',
                         { level: "info" },
                     );
                 }

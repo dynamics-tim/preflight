@@ -4,10 +4,15 @@ description: |
   Manages the full Copilot skill lifecycle — extraction, evaluation, improvement,
   and cleanup. Use when: "extract skill", "create skill from session",
   "review last session", "save as skill", "evaluate skills", "improve skills",
-  "audit skills", "clean up skills", "review skill quality", "stale skills".
+  "audit skills", "clean up skills", "review skill quality", "stale skills",
+  "session patterns", "activity logs", "archive unused skills".
 ---
 
-# Skill Extractor — Session Pattern Knowledge
+# Skill Extractor — Session Pattern Knowledge & Workflows
+
+Use this skill for skill-lifecycle requests: extraction, evaluation, improvement, cleanup.
+The workflows below are recommended procedures — adapt to available data and user context.
+Session store is the primary data source; JSONL is optional enrichment.
 
 Provides pattern detection heuristics and data source knowledge for analyzing
 session history and generating reusable skills. Uses two data sources:
@@ -192,3 +197,151 @@ Use the **session store as primary** for all evaluation. JSONL provides optional
 | **High (P1)** | Zero session store matches across all history | FTS5 `search_index` query | Skill appears unused — verify or archive |
 | **Medium (P2)** | Trigger description mismatch (too broad/narrow) | FTS5 vs `session_files` cross-check | Skill fires wrong or not at all — adjust `description` |
 | **Low (P3)** | Minor file pattern drift | `session_files` shows adjacent files | Expand patterns when convenient |
+
+## Data Requirements
+
+Before proceeding with any workflow, assess available data:
+
+1. **Always query the session store first.** Use `sql` with `database: "session_store"`:
+   ```sql
+   SELECT COUNT(*) as sessions, MAX(updated_at) as latest FROM sessions;
+   ```
+   - **3+ sessions:** Sufficient for evaluation and cleanup.
+   - **10+ sessions:** Excellent — strong cross-session patterns are detectable.
+   - **Fewer than 3:** Tell the user more sessions are needed.
+
+2. **Check JSONL for extraction workflows.** Read `.copilot/session-activity.jsonl` if extraction is requested.
+   - **Missing:** Extraction still works at reduced level using session store (file patterns, user requests). Offer to install the session-logger extension.
+   - **Sparse** (<10 tool calls): Suggest accumulating more data.
+   - **Sufficient:** Use hybrid — session store for cross-session patterns, JSONL for tool sequences.
+
+3. **For evaluation and cleanup, session store alone is sufficient.** Do not block on JSONL.
+
+## Extraction Workflow
+
+1. **Query the session store for cross-session patterns.** Use `sql` with `database: "session_store"` to identify:
+   - **Repeated file patterns:** Which files are edited together across sessions?
+   - **Recurring user requests:** What do users repeatedly ask for? (query `turns` where `turn_index = 0`)
+   - **File co-editing clusters:** Which files always appear in the same sessions?
+
+2. **Load JSONL for tool-level detail (if available).** Read `.copilot/session-activity.jsonl`.
+   - **If available:** Continue to step 3 for phase detection and tool-sequence analysis.
+   - **If missing:** Skip steps 3–4. Use session store patterns alone — note this limitation when presenting candidates.
+
+3. **Detect session phases (JSONL only).** Split sessions into phases using `report_intent` entries. Each `report_intent` with an `intent` field marks a new phase. If none exist, treat as single phase.
+
+4. **Identify repeatable patterns.** Combine session store and JSONL signals:
+   - **Cross-session** (store): File co-editing clusters (3+ sessions), recurring request types, domain hotspots
+   - **Phase-level** (JSONL, higher value): Same phase types in same order, phase templates with consistent tool sequences
+   - **Tool-level** (JSONL, within a phase): Repeated 3+ tool chains, paired file operations, recurring parameterizable commands
+
+5. **Score and rank candidates.**
+   - Repetition count (2× = medium, 3+× = high)
+   - Cross-session evidence scores higher than JSONL-only
+   - Sequence length (longer = more valuable)
+   - Phase-level patterns score 2× higher than tool-level patterns
+   - Skip patterns with fewer than 3 steps
+
+6. **Present candidates to the user.** For each candidate show: name (kebab-case), description, detected steps, file patterns, repetition count. Use `ask_user` with multi-select.
+
+7. **Generate skill files.** For each confirmed pattern:
+   - Create `.github/skills/<name>/SKILL.md` with proper frontmatter
+   - Extract shell commands into `run.sh` + `run.ps1` if applicable
+   - Apply generalization rules (see below)
+
+8. **Clean up.** Remove `.copilot/pending-skill-review` if it exists. Summarize what was created.
+
+## Evaluation & Improvement Workflow
+
+When the user asks to "evaluate skills", "improve skills", or "audit skills":
+
+1. **Inventory existing skills.** Use `glob` to find all `.github/skills/*/SKILL.md`. Read each to extract: name, description, workflow steps, file patterns, allowed-tools.
+
+2. **Query the session store for usage evidence.** For each skill:
+   - **Skill relevance:** FTS5 search using the skill's description keywords — count matching sessions
+   - **File pattern activity:** Check `session_files` for the skill's file patterns
+   - **User intent matching:** Search first-turn user messages for related requests
+
+3. **Evaluate each skill** using session store data (and optionally JSONL):
+   - **Activity alignment** — How many sessions match? Zero = likely unused. Old-only = declining.
+   - **Trigger accuracy** — Description keywords vs FTS5 results. Mismatch = too broad or too narrow.
+   - **Workflow drift** — File patterns and user intents still aligned with documented scope?
+   - **File pattern staleness** — `glob` + `session_files` to check patterns match existing, recently-edited files.
+
+4. **Categorize findings:**
+   - 🔴 **Action needed** — Broken patterns or severe drift
+   - 🟡 **Improvement available** — Trigger refinement, minor drift, low usage
+   - 🟢 **Healthy** — Actively used, workflow matches
+
+5. **Present findings** with summary table, then per-skill details with current vs. proposed changes. Use `ask_user` with multi-select for improvements.
+
+6. **Apply selected improvements.** Use `edit` on SKILL.md files. Append to "Revision History" table.
+
+7. **Summarize changes** and remind user to commit.
+
+## Cleanup Workflow
+
+When the user asks to "clean up skills", "remove stale skills", or "archive unused skills":
+
+1. **Inventory skills and query session store.** For each skill, query for matching activity via FTS5 and `session_files`.
+
+2. **Identify cleanup candidates** — skills where:
+   - No sessions match the skill's domain across all history
+   - File patterns have no `session_files` activity AND `glob` matches zero files
+   - File patterns exist on disk but zero session activity in last 30+ sessions
+
+3. **Present candidates** via `ask_user` multi-select with reason per skill. Archive to `.copilot/archived-skills/`.
+
+4. **Archive selected skills.** Move `.github/skills/<name>/` to `.copilot/archived-skills/<name>/`.
+
+5. **Summarize** — list archived skills, note they can be restored by moving back.
+
+## Generalization Rules
+
+When converting session activity into reusable skill definitions:
+- **Paths:** `src/components/Button.tsx` → `src/components/<ComponentName>.tsx` in workflow, `src/components/*.tsx` in file patterns
+- **Commands:** `npm test -- --filter=Button` → `npm test -- --filter=<name>`
+- **File groups:** If pattern always touches `[name].ts` + `[name].test.ts`, document the pairing
+- **Tool sequences:** Describe the _purpose_ of each step, not just the tool name
+
+## Output Format for Generated Skills
+
+```markdown
+---
+name: <kebab-case-name>
+description: <One-line description precise enough for Copilot auto-matching>
+allowed-tools:
+  - <only tools the skill needs>
+---
+
+# <Skill Title>
+
+## When to Use
+<One paragraph describing when this skill should activate>
+
+## Workflow
+1. <Step description> — Use `tool` to...
+2. <Step description> — Use `tool` to...
+
+## File Patterns
+- `<glob>` — <what these files are>
+
+## Rules
+- <Any conventions or constraints observed>
+
+## Revision History
+
+| Version | Date | Change | Reason |
+|---------|------|--------|--------|
+| v1 | <date> | Initial extraction | Detected pattern: <brief description> |
+```
+
+## Constraints
+
+- Do NOT create skills without user confirmation via `ask_user`
+- Do NOT modify existing skills during extraction — flag duplicates instead
+- Do NOT generate skills from patterns with fewer than 3 steps
+- Do NOT generate overly broad file globs (`**/*`)
+- If the session log has fewer than 10 tool calls, suggest accumulating more data
+- Always generate helper scripts as `.sh` + `.ps1` pairs
+- Do NOT delete skill files — always archive to `.copilot/archived-skills/`

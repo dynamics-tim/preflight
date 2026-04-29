@@ -1,6 +1,29 @@
 {
   "_comment": "Maps each plugin release to config improvements. Used by the preflight agent to surface targeted upgrade actions when a version bump is detected between the installed plugin and the version stored in .preflight-state.json.",
   "changelog": {
+    "1.5.0": {
+      "summary": "Agent consolidation — skill-extractor agent absorbed into preflight. @preflight now handles skill extraction, evaluation, and cleanup directly. Auto-routing enabled via disable-model-invocation. Dead log-tool-call scripts removed.",
+      "configImpacts": [
+        {
+          "type": "improvement",
+          "description": "@skill-extractor agent removed — skill lifecycle workflows (extract, evaluate, improve, clean up) are now handled directly by @preflight using the skill-extractor skill for domain knowledge. Users no longer need a separate agent invocation.",
+          "affectedFiles": [],
+          "recommendation": "Use @preflight for all skill lifecycle tasks: @preflight review last session, @preflight evaluate skills, @preflight clean up skills."
+        },
+        {
+          "type": "improvement",
+          "description": "Auto-routing enabled — preflight agent can now be auto-delegated to by the Copilot CLI when user intent matches setup/configuration tasks, without requiring explicit @preflight invocation.",
+          "affectedFiles": [],
+          "recommendation": "No action needed. Copilot will automatically route relevant requests to preflight."
+        },
+        {
+          "type": "cleanup",
+          "description": "Removed dead log-tool-call.sh and log-tool-call.ps1 scripts from skills/skill-extractor/. These referenced a non-functional env-var hook interface superseded by the session-logger SDK extension.",
+          "affectedFiles": [],
+          "recommendation": "No action needed. The session-logger extension provides superior functionality."
+        }
+      ]
+    },
     "1.4.2": {
       "summary": "lean-ctx tool preference instructions — preflight now generates a tool substitution table in copilot-instructions.md when lean-ctx is configured, teaching Copilot to prefer ctx_read, ctx_shell, ctx_tree, and ctx_search over native tools.",
       "configImpacts": [

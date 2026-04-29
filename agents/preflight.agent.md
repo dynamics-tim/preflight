@@ -4,6 +4,7 @@ description: Scans your codebase, recommends a tailored GitHub Copilot setup, an
 agents: ["*"]
 model: Claude Sonnet 4.6 (copilot)
 argument-hint: "Include 'full' or 'minimal' for preset configurations, or leave blank for a custom setup flow."
+disable-model-invocation: false
 user-invocable: true
 ---
 
@@ -215,7 +216,7 @@ Store:
 
 On any read or parse error, set `leanCtxConfigured = false` and proceed silently. Never surface this check to the user.
 
-The current installed version of preflight is **CURRENT_PLUGIN_VERSION = "1.4.2"**.
+The current installed version of preflight is **CURRENT_PLUGIN_VERSION = "1.5.0"**.
 
 Silently perform two checks:
 
@@ -675,7 +676,7 @@ This step exists because generated agents use framework defaults that are wrong 
 
 **Recommend when** the project has at least some Copilot config already set up (instructions or agents). This is an advanced feature that benefits active Copilot users.
 
-Offer to install the session-logger extension, which enables the `@skill-extractor` agent to analyze session activity and generate reusable skills.
+Offer to install the session-logger extension, which enriches session data for skill extraction and generation.
 
 File: `.github/extensions/session-logger/extension.mjs`
 
@@ -683,13 +684,13 @@ Use `ask_user` with a boolean:
 
 ```json
 {
-  "message": "⚡ **Session learning** (`.github/extensions/session-logger/extension.mjs`)\n\nInstructions and agents tell Copilot *how* to work. **Extensions** automate what happens *around* sessions — like git hooks but for Copilot.\n\nThis extension tracks your workflow patterns (<1ms per tool call). After a few sessions, `@skill-extractor` can analyze them and auto-generate reusable **skills** — think of them as cheat sheets that load only when relevant, so Copilot gets better at your specific workflows over time.\n\n📁 Logs stay local in `.copilot/` (not committed).",
+  "message": "⚡ **Session learning** (`.github/extensions/session-logger/extension.mjs`)\n\nInstructions and agents tell Copilot *how* to work. **Extensions** automate what happens *around* sessions — like git hooks but for Copilot.\n\nThis extension tracks your workflow patterns (<1ms per tool call). After a few sessions, you can ask `@preflight` to analyze them and auto-generate reusable **skills** — think of them as cheat sheets that load only when relevant, so Copilot gets better at your specific workflows over time.\n\n📁 Logs stay local in `.copilot/` (not committed).",
   "requestedSchema": {
     "properties": {
       "install": {
         "type": "boolean",
         "title": "Install session-logger extension + .gitignore entry",
-        "description": "Tracks tool usage per session (<1ms overhead). After 3-5 sessions, @skill-extractor can analyze patterns and auto-generate reusable skills",
+        "description": "Tracks tool usage per session (<1ms overhead). After 3-5 sessions, @preflight can analyze patterns and auto-generate reusable skills",
         "default": false
       }
     },
@@ -698,7 +699,7 @@ Use `ask_user` with a boolean:
 }
 ```
 
-Default to **false** — `@skill-extractor` works without the hook. This is opt-in enrichment for power users.
+Default to **false** — skill extraction works without the hook via the session store. This is opt-in enrichment for power users.
 
 If the user accepts, create `.github/extensions/session-logger/extension.mjs` using the template below.
 
@@ -727,7 +728,7 @@ const session = await joinSession({
                 );
                 if (existsSync(PENDING)) {
                     await session.log(
-                        '[skill-extractor] Previous session has unreviewed patterns — say "review last session" to extract skills, or "evaluate skills" to improve existing ones.',
+                        '[preflight] Previous session has unreviewed patterns — say "review last session" to extract skills, or "evaluate skills" to improve existing ones.',
                         { level: "info" },
                     );
                 }
@@ -773,7 +774,7 @@ Also append `.copilot/` to the project's `.gitignore` (create it if it doesn't e
 
 Add the extension file to the `managedFiles` array in `.preflight-state.json`.
 
-> 💡 **Manage with:** `@skill-extractor review last session` after any session with significant coding work; `@skill-extractor evaluate skills` periodically to improve existing skills; `/skills list` to see all active skills.
+> 💡 **Manage with:** `@preflight review last session` after any session with significant coding work; `@preflight evaluate skills` periodically to improve existing skills; `/skills list` to see all active skills.
 
 #### Category 6: Config maintenance
 
@@ -1081,7 +1082,7 @@ After all files are created, create or update `.github/.preflight-state.json`:
 }
 ```
 
-- `pluginVersion` — always set to `CURRENT_PLUGIN_VERSION` ("1.4.2"). This is what future runs compare against to detect version drift and surface config improvements from newer plugin releases.
+- `pluginVersion` — always set to `CURRENT_PLUGIN_VERSION` ("1.5.0"). This is what future runs compare against to detect version drift and surface config improvements from newer plugin releases.
 
 If `.preflight-state.json` already exists, update it (merge `managedFiles`, update `lastRun`, `detectedStack`, and `pluginVersion`).
 
@@ -1120,15 +1121,15 @@ it reads your repo-wide rules + TypeScript rules + test rules — all together, 
 |---|---|---|
 | `@preflight` | Re-scan and update config | When your stack changes or config is stale |
 | `@preflight audit` | Review existing config for drift | After significant code changes or when counts/patterns feel off |
-| `@skill-extractor` | Extract patterns from sessions into skills | After 3-5 coding sessions — works with session store, even richer with hook |
-| `@skill-extractor evaluate skills` | Review and improve existing skills | Periodically, or when skills feel inaccurate |
+| `@preflight review last session` | Extract patterns from sessions into skills | After 3-5 coding sessions — works with session store, even richer with hook |
+| `@preflight evaluate skills` | Review and improve existing skills | Periodically, or when skills feel inaccurate |
 | `@<agent-name>` | <one-line description> | <when to use based on what was created> |
 | `/instructions` | Toggle and verify active instructions | Check which files are loaded, diagnose unexpected behavior |
 | `/agent` | Browse and invoke agents | Find available agents by name or description |
 | `/skills list` | See active skills | Verify installed skills are loaded correctly |
 | `gh skill install <path>` | Install community skills | Add skills from `github/awesome-copilot` |
 
-> **Which agent does what?** `@preflight` manages config files. `@skill-extractor` analyzes session history. Don't use `@preflight` to evaluate sessions — that's `@skill-extractor`'s domain.
+> **Skill lifecycle:** `@preflight` handles everything — config setup, audits, AND skill extraction/evaluation/cleanup. The skill-extractor skill provides the domain knowledge for session analysis workflows.
 
 > **Tip:** All agents are invoked with `@name` in Copilot chat. Instructions and skills load automatically — no invocation needed.
 ```
@@ -1292,7 +1293,7 @@ Structure: YAML frontmatter (`name`, `description`, `tools`) → identity paragr
 9. **Ask when uncertain.** If you can't infer a convention, use `ask_user` to ask the user rather than guessing.
 10. **Keep it concise.** Copilot instructions that are too long get ignored. Quality over quantity.
 11. **Respect existing work.** If the user has hand-crafted instructions, treat them as authoritative.
-12. **Redirect session analysis to `@skill-extractor`.** If the user asks to evaluate sessions, extract skills, review past sessions, identify workflow patterns, or analyze activity logs — respond immediately: "That's `@skill-extractor`'s domain. Try: `@skill-extractor review last session`." Do not attempt to perform session analysis yourself.
+12. **Handle skill lifecycle requests directly.** When the user asks to evaluate sessions, extract skills, review past sessions, identify workflow patterns, analyze activity logs, clean up stale skills, or improve existing skills — use the skill-extractor skill's workflows. The skill provides data source guidance, extraction steps, evaluation heuristics, and cleanup procedures. Do NOT redirect to another agent — you own these workflows.
 
 ### Educational Tone Rules
 
