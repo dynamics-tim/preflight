@@ -1,6 +1,17 @@
 {
   "_comment": "Maps each plugin release to config improvements. Used by the preflight agent to surface targeted upgrade actions when a version bump is detected between the installed plugin and the version stored in .preflight-state.json.",
   "changelog": {
+    "1.5.2": {
+      "summary": "User confirmation checkpoints — scan results confirmation with correction form, conditional deep scan pattern verification, agent content preview in selection prompt, strengthened uncertainty protocol with must-ask/may-proceed triggers, canonical confirmedStack/confirmedPatterns data flow.",
+      "configImpacts": [
+        {
+          "type": "improvement",
+          "description": "Scan results confirmation step added — preflight now asks the user to verify detected stack (languages, framework, test framework) before generating any files. User corrections propagate to all generated content via canonical confirmedStack.",
+          "affectedFiles": [],
+          "recommendation": "No action needed. Re-run @preflight to benefit from the confirmation workflow."
+        }
+      ]
+    },
     "1.5.1": {
       "summary": "Parallelized agent workflow — Phase 1 scanning batched into 3 turns instead of 11, Phase 3 interleaving for overlapped file creation, Phase 4 dependency-grouped parallel scaffolding, optional sub-agent delegation for monorepos.",
       "configImpacts": [
