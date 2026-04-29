@@ -1,0 +1,23 @@
+{
+  "version": "1.0.0",
+  "pluginVersion": "1.4.0",
+  "lastRun": "2025-07-17T00:00:00Z",
+  "detectedStack": {
+    "languages": ["markdown", "bash", "powershell", "json"],
+    "frameworks": ["copilot-plugin"],
+    "packageManager": null,
+    "testFramework": null,
+    "cicd": null
+  },
+  "managedFiles": [
+    ".github/copilot-instructions.md",
+    ".github/instructions/agents.instructions.md",
+    ".github/instructions/scripts.instructions.md",
+    ".github/instructions/markdown.instructions.md",
+    ".github/instructions/hooks.instructions.md",
+    ".github/instructions/commit-message.instructions.md",
+    ".github/hooks/session-logger.json",
+    ".github/hooks/config-freshness.json"
+  ],
+  "reminderDaysThreshold": 30
+}

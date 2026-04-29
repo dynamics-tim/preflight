@@ -1,13 +1,10 @@
 ---
 name: preflight
 description: Scans your codebase, recommends a tailored GitHub Copilot setup, and scaffolds all configuration files interactively. Use when setting up or improving Copilot configuration for any project.
-tools:
-  - read
-  - edit
-  - search
-  - execute
-  - web
-  - ask_user
+agents: ["*"]
+model: Claude Sonnet 4.6 (copilot)
+argument-hint: "Include 'full' or 'minimal' for preset configurations, or leave blank for a custom setup flow."
+user-invocable: true
 ---
 
 # preflight — GitHub Copilot Setup Agent
@@ -151,6 +148,12 @@ Use `glob` to check for:
 - `CLAUDE.md`
 - `.cursorrules`
 - `copilot-setup-steps.yml` or `.github/copilot-setup-steps.yml`
+- `.vscode/settings.json`
+- `.mcp.json`
+
+If `.vscode/settings.json` exists, `read` it and check whether `github.copilot.chat.commitMessageGeneration.instructions` is already present. Store as `vsCodeCommitSettingsExist` (bool).
+
+If `.github/copilot-instructions.md` exists and does NOT contain `<!-- managed-by: preflight -->`, read the first 20 lines. If none of the detected framework names (from steps 1a–1b) appear in those lines, store `initGeneratedInstructions = true` — the file is likely a `copilot init` bootstrap rather than hand-crafted content. Otherwise store `initGeneratedInstructions = false`. If the file does not exist or contains `<!-- managed-by: preflight -->`, store `initGeneratedInstructions = false`.
 
 #### 1g. Detect CI/CD
 
@@ -177,9 +180,42 @@ Use `glob` for:
 - `.stylelintrc*`
 - `golangci-lint` config
 
-#### 1i. Check for plugin updates
+#### 1i. Detect commit conventions
 
-The current installed version of preflight is **CURRENT_PLUGIN_VERSION = "1.3.0"**.
+Use `glob` for:
+
+- `commitlint.config.*`, `.commitlintrc`, `.commitlintrc.json`, `.commitlintrc.yaml`, `.commitlintrc.yml`, `.commitlintrc.js`, `.commitlintrc.cjs`
+- `.husky/commit-msg`
+
+Also check `package.json` dependencies (already read in 1a) for `@commitlint/config-conventional` or `@commitlint/config-angular`.
+
+Store:
+- `commitConventionsDetected` (bool) — true if any commitlint config or husky commit-msg hook found, or `@commitlint` dep detected
+- `commitlintConfigFile` (string or null) — path to the first commitlint config found, if any
+
+#### 1j. Detect `gh` CLI availability
+
+Execute `gh --version` (Bash) or `Get-Command gh -ErrorAction SilentlyContinue` (PowerShell). If the command succeeds, store `ghCliAvailable = true`. On any error, store `ghCliAvailable = false`. Never surface this check to the user.
+
+#### 1k. Detect lean-ctx MCP configuration
+
+Silently check for an existing lean-ctx MCP server. Search in three locations:
+
+1. **Personal config** — `~/.copilot/mcp-config.json` (Unix) or `%USERPROFILE%\.copilot\mcp-config.json` (Windows)
+2. **Project config** — `.mcp.json` at the repo root (already discovered in step 1f if present)
+3. **VS Code workspace config** — `.vscode/mcp.json` (already discovered in step 1f if present)
+
+For each file that exists, read it and parse as JSON. Inspect `mcpServers` for any entry where:
+- the server key equals `lean-ctx`, **or**
+- the `command` value contains the string `lean-ctx`
+
+Store:
+- `leanCtxConfigured` (bool) — true if a matching entry is found in any location
+- `leanCtxConfigSource` (string or null) — `"personal"`, `"project"`, or `"vscode"` (whichever was found first), or null if not found
+
+On any read or parse error, set `leanCtxConfigured = false` and proceed silently. Never surface this check to the user.
+
+The current installed version of preflight is **CURRENT_PLUGIN_VERSION = "1.4.2"**.
 
 Silently perform two checks:
 
@@ -295,6 +331,53 @@ After the deep scan completes, present the methodology briefly: "I sampled [N] f
 
 If the user selects **false** or **declines** the form, proceed with Phase 3 using only the quick scan data.
 
+#### 2.5. Community skill discovery
+
+Consult the `preflight-scan` skill's **Community Skills Mapping** table. Match the detected stack signals from Phase 1 against the table's "Detected Signal" column. Always include the two stack-agnostic skills (`security-review` and `conventional-commit`).
+
+If one or more skills match, use `ask_user` with a multi-select array — pre-select all matches by default:
+
+```json
+{
+  "message": "🌐 **Community skills from `github/awesome-copilot`**\n\nBeyond your custom config, the community has already built reusable skills for your stack. Each skill adds a specialist capability you can invoke with `@skill-name`.\n\nBased on your detected stack, these match your project:",
+  "requestedSchema": {
+    "properties": {
+      "skills": {
+        "type": "array",
+        "title": "Select community skills to install",
+        "description": "Each skill is a pre-built specialist for your stack — select all that look useful",
+        "items": {
+          "type": "string",
+          "enum": ["<skill-name> — <one-line description>"]
+        },
+        "default": ["<all matched skill names>"]
+      }
+    }
+  }
+}
+```
+
+Adapt the `enum` and `default` arrays to the actual matched skills.
+
+For each skill the user selects:
+
+- If `ghCliAvailable = true`: show the install command as a code block the user can run:
+  ```
+  gh skill install github/awesome-copilot/skills/<skill-name>
+  ```
+  Offer to run it via `execute` if the user prefers.
+
+- If `ghCliAvailable = false`: show the manual path instead:
+  ```
+  # Copy the skill folder to: ~/.copilot/skills/<skill-name>/
+  # or: .github/skills/<skill-name>/
+  # Source: https://github.com/github/awesome-copilot/tree/main/skills/<skill-name>
+  ```
+
+Track which community skills were installed in a `installedCommunitySkills` list for use in the Phase 4 summary.
+
+If no skills match, skip this step silently.
+
 #### 2d. Plugin update notification
 
 Run this step only if `plugin_outdated = true` OR `config_stale = true`. Otherwise skip silently.
@@ -361,7 +444,32 @@ Present categories in this order:
 
 File: `.github/copilot-instructions.md`
 
-Use `ask_user` with a boolean:
+**When `initGeneratedInstructions = true`** (file exists, no managed markers, generic content), use `ask_user` with a oneOf:
+
+```json
+{
+  "message": "📋 **Repository-wide instructions** (`.github/copilot-instructions.md`)\n\nI found an existing file — it looks like it was bootstrapped with `copilot init`. I can **enrich** it by inserting your detected stack specifics (<detected frameworks/languages>) wrapped in managed markers, so future re-runs only update that section. Or I can replace the whole file, or skip it.\n\n**Enrich:** Appends managed content alongside your existing text — safe, non-destructive.\n**Replace:** Generates a fresh file from scratch using your detected stack.",
+  "requestedSchema": {
+    "properties": {
+      "action": {
+        "type": "string",
+        "title": "What would you like to do?",
+        "oneOf": [
+          { "const": "enrich", "title": "Enrich existing — add stack-specific content alongside my text" },
+          { "const": "replace", "title": "Replace entirely — generate a fresh file from scratch" },
+          { "const": "skip", "title": "Skip — leave it as-is" }
+        ],
+        "default": "enrich"
+      }
+    },
+    "required": ["action"]
+  }
+}
+```
+
+If the user selects **"enrich"**, use the merge strategy from step 4a (case 3): append managed-marker-wrapped content. If **"replace"**, proceed as a fresh creation. If **"skip"**, move to Category 2.
+
+**When `initGeneratedInstructions = false`** (no pre-existing file, or a hand-crafted one), use `ask_user` with a boolean:
 
 ```json
 {
@@ -381,6 +489,8 @@ Use `ask_user` with a boolean:
 ```
 
 Generate content following the structure in "Instruction Generation Rules" below. Include `<!-- managed-by: preflight -->` markers. Adapt to the actual detected stack — use real project names, commands, and conventions.
+
+> 💡 **Manage with:** `/instructions` to verify active instructions, edit directly — changes take effect immediately without restarting.
 
 #### Category 2: Path-specific instructions
 
@@ -434,7 +544,76 @@ Use `ask_user` with a multi-select array listing all detected instruction files,
 
 Adapt the `enum` and `default` arrays to the actual detected stack — only list items relevant to the project.
 
-#### Category 3: Custom agents
+> 💡 **Manage with:** `/instructions` to toggle which instruction files are active; each file auto-loads only for matching `applyTo` patterns — no manual wiring needed.
+
+#### Category 3: Commit message instructions
+
+**Always recommend** — commit message conventions are universally useful. Recommend more prominently (note in the `message`) when `commitConventionsDetected = true`.
+
+Files:
+- `.github/instructions/commit-message.instructions.md` — the instruction content
+- `.vscode/settings.json` — wires the file to commit generation only
+
+Use `ask_user` with a boolean:
+
+```json
+{
+  "message": "💬 **Commit message instructions** (`.github/instructions/commit-message.instructions.md`)\n\nYou just set up path-specific rules that load when editing code. This is a different kind: an instruction file that loads *only* when you hit ✨ to generate a commit message — it never pollutes inline suggestions or chat.\n\n**Without it:** Copilot guesses a commit style (or ignores your conventions entirely).\n**With it:** Every generated commit message follows Conventional Commits, uses your scopes, and matches your project's style automatically.\n\nI'll create the instruction file and add a single entry to `.vscode/settings.json` to wire it up.<if commitConventionsDetected>I also detected existing commit conventions tooling (<commitlintConfigFile or 'commitlint/husky'>), so I'll tailor the scopes and examples to your setup.</if>",
+  "requestedSchema": {
+    "properties": {
+      "create": {
+        "type": "boolean",
+        "title": "Create commit message instructions",
+        "description": "Creates .github/instructions/commit-message.instructions.md with Conventional Commits rules, project-derived scopes, and examples. Wires it in .vscode/settings.json so it only loads when generating commit messages.",
+        "default": true
+      }
+    },
+    "required": ["create"]
+  }
+}
+```
+
+If the user accepts:
+
+1. **Create `.github/instructions/commit-message.instructions.md`** using the rules in "Instruction Generation Rules" below. Wrap in managed markers. No `applyTo` frontmatter — this file is loaded via VS Code settings, not glob patterns.
+
+2. **Update or create `.vscode/settings.json`**:
+   - If the file does not exist → create it with only the commit generation key
+   - If the file exists and `github.copilot.chat.commitMessageGeneration.instructions` is not yet set → read the file, add the key, write it back
+   - If the key already exists (`vsCodeCommitSettingsExist = true`) → skip silently and note in the summary
+   - The setting value:
+     ```json
+     "github.copilot.chat.commitMessageGeneration.instructions": [
+       { "file": ".github/instructions/commit-message.instructions.md" }
+     ]
+     ```
+
+3. **Detect and clean misplaced commit section** — if `.github/copilot-instructions.md` was created or already exists, `read` it and check for a section that looks like a commit message guide (headers matching `/##?\s+(commit|conventional commits|commit messages?)/i`). If found, use `ask_user` with a boolean:
+
+```json
+{
+  "message": "I found a commit messages section in your `.github/copilot-instructions.md`. Since you now have a dedicated instruction file that loads only during commit generation, this section in the repo-wide file is redundant — and it loads on every Copilot interaction, not just commits.\n\nShould I remove the misplaced section from `.github/copilot-instructions.md`?",
+  "requestedSchema": {
+    "properties": {
+      "clean": {
+        "type": "boolean",
+        "title": "Remove misplaced commit messages section from copilot-instructions.md",
+        "description": "The section will be replaced by the dedicated commit-message.instructions.md file which loads only when generating commit messages",
+        "default": true
+      }
+    },
+    "required": ["clean"]
+  }
+}
+```
+
+If accepted, remove the misplaced section using the managed markers merge strategy.
+
+4. **Register** `.github/instructions/commit-message.instructions.md` in `managedFiles` in `.github/.preflight-state.json`.
+
+> 💡 **Note:** Commit instructions are wired via `.vscode/settings.json`, not an `applyTo` glob — they won't appear in the `/instructions` list, but they load automatically whenever Copilot generates a commit message.
+
+#### Category 4: Custom agents
 
 Only recommend if there's a clear use case. Common recommendations:
 
@@ -490,7 +669,9 @@ Adapt the `enum` and `default` arrays to only include agents relevant to the pro
 
 This step exists because generated agents use framework defaults that are wrong for projects with custom test infrastructure. Never skip it.
 
-#### Category 4: Session learning
+> 💡 **Manage with:** `/agent` in Copilot chat to browse installed agents; invoke any agent with `@agent-name` in any prompt. To update an agent, edit its `.agent.md` file directly — changes take effect immediately.
+
+#### Category 5: Session learning
 
 **Recommend when** the project has at least some Copilot config already set up (instructions or agents). This is an advanced feature that benefits active Copilot users.
 
@@ -517,7 +698,7 @@ Use `ask_user` with a boolean:
 }
 ```
 
-Default to **false** — this is opt-in for power users.
+Default to **false** — `@skill-extractor` works without the hook. This is opt-in enrichment for power users.
 
 If the user accepts, create `.github/extensions/session-logger/extension.mjs` using the template below.
 
@@ -592,7 +773,9 @@ Also append `.copilot/` to the project's `.gitignore` (create it if it doesn't e
 
 Add the extension file to the `managedFiles` array in `.preflight-state.json`.
 
-#### Category 5: Config maintenance
+> 💡 **Manage with:** `@skill-extractor review last session` after any session with significant coding work; `@skill-extractor evaluate skills` periodically to improve existing skills; `/skills list` to see all active skills.
+
+#### Category 6: Config maintenance
 
 **Always recommend** when the project has a `.github/.preflight-state.json` from a previous run. Also recommend on first runs — it ensures future re-runs are prompted.
 
@@ -669,11 +852,161 @@ const session = await joinSession({
 
 Add the extension file to the `managedFiles` array in `.preflight-state.json`. Also store `"reminderDaysThreshold"` in the state file (the value from the user's selection, or 30 if they accepted the default).
 
-#### Category 6: MCP config (optional — v2)
+> 💡 **Manage with:** re-run `@preflight` anytime your stack changes; `@preflight audit` for a targeted drift check against your stored state.
 
-If relevant, briefly mention: "MCP servers can connect Copilot to external tools (databases, APIs, etc.). This is an advanced feature best configured per-developer."
+#### Category 7: lean-ctx — token cost reduction
 
-Do NOT scaffold MCP config in v1.
+**Skip this category if `leanCtxConfigured = true`.** Instead, output one line: "✅ lean-ctx already configured (`<leanCtxConfigSource>`) — you're already saving tokens on every Copilot interaction." Then move to Phase 4.
+
+**If `leanCtxConfigured = false`**, use `ask_user` with a oneOf:
+
+```json
+{
+  "message": "💡 **lean-ctx — reduce Copilot token costs** (`~/.copilot/mcp-config.json`)\n\nYou just set up instructions, agents, and hooks that shape how Copilot reasons about your project. lean-ctx works at two layers:\n\n**MCP layer (74–99% savings):** replaces raw file reads and tool responses with compressed, cached equivalents — repeated file reads drop from ~2,000 tokens to ~13 tokens.\n\n**Shell hook layer (60–95% savings):** after running `lean-ctx setup`, 23 CLI commands (git, npm, docker, gh, pip, …) are transparently compressed before their output reaches the LLM — no workflow changes needed.\n\n**Without it:** Every file read and shell command sends full, uncompressed output to the LLM.\n**With it:** A typical session saves 60–99% of context tokens — faster responses and lower API costs.\n\nThis is a **per-developer setting** — it affects your machine only and is not committed to the repo.",
+  "requestedSchema": {
+    "properties": {
+      "action": {
+        "type": "string",
+        "title": "How would you like to proceed?",
+        "oneOf": [
+          { "const": "install", "title": "Set it up now — add to ~/.copilot/mcp-config.json and guide me through lean-ctx setup" },
+          { "const": "instructions", "title": "Show me the steps — I'll add it myself" },
+          { "const": "skip", "title": "Skip — I'll set this up later" }
+        ],
+        "default": "install"
+      }
+    },
+    "required": ["action"]
+  }
+}
+```
+
+**If the user selects "install":**
+
+First check if the lean-ctx binary is available: execute `lean-ctx --version` (Bash) or `lean-ctx --version` in PowerShell. If the binary is not found, tell the user and show install options before proceeding:
+
+```
+lean-ctx is not installed yet. Install it first:
+
+  # Node.js (works on Windows, macOS, and Linux)
+  npm install -g lean-ctx-bin
+
+  # Universal installer (Unix / WSL / Git Bash)
+  curl -fsSL https://leanctx.com/install.sh | sh
+
+  # Rust / Cargo
+  cargo install lean-ctx
+
+  # macOS / Linux via Homebrew
+  brew tap yvgude/lean-ctx && brew install lean-ctx
+
+Then re-run @preflight — or proceed below to add the MCP config now so it's ready when lean-ctx is installed.
+```
+
+Continue to add the MCP config entry regardless, so it's ready when lean-ctx is installed.
+
+Read `~/.copilot/mcp-config.json` (or `%USERPROFILE%\.copilot\mcp-config.json` on Windows). Handle each case:
+
+| State | Action |
+|---|---|
+| File does not exist | Create it with `{ "mcpServers": {} }` first |
+| Valid JSON, `mcpServers` key missing | Add `"mcpServers": {}` to the root object |
+| Valid JSON, `lean-ctx` key already present | Skip — do not overwrite existing entry |
+| Valid JSON, `lean-ctx` absent | Add entry (see below) |
+| Invalid / unparseable JSON | Do NOT rewrite. Instead, switch to "instructions" path and tell the user: "Your mcp-config.json contains invalid JSON — I can't safely edit it. Please fix the JSON first, then add the entry manually." |
+
+The entry to add under `mcpServers`:
+
+```json
+"lean-ctx": {
+  "command": "lean-ctx",
+  "args": []
+}
+```
+
+After writing the file, tell the user: "MCP entry added to `~/.copilot/mcp-config.json`. **Reload Copilot** (restart VS Code or run `Developer: Reload Window`) to activate the MCP layer."
+
+**Shell hook setup offer** — if the lean-ctx binary IS available (found in the binary check above), use `ask_user` to offer shell hook integration:
+
+```json
+{
+  "message": "🐚 **Enable shell hook compression (60–95% CLI savings)**\n\nlean-ctx can also transparently compress the output of 23 CLI commands — git, npm, docker, gh, pip, and more — before it reaches the LLM. This is separate from the MCP layer and requires running one setup command:\n\n```\nlean-ctx setup\n```\n\nThis is safe and idempotent — it adds shell aliases to your profile (`~/.zshrc`, `~/.bashrc`, or PowerShell profile) and auto-detects any other editors (Cursor, Claude Code, Windsurf, etc.) to configure. Run `lean-ctx-off` at any time to disable for the current session.",
+  "requestedSchema": {
+    "properties": {
+      "runSetup": {
+        "type": "boolean",
+        "title": "Run lean-ctx setup now to enable shell hook compression",
+        "description": "Adds shell aliases for 23 commands and auto-configures any other detected editors",
+        "default": true
+      }
+    },
+    "required": ["runSetup"]
+  }
+}
+```
+
+- If the user accepts: execute `lean-ctx setup` and show the output. Then tell the user: "Shell hooks are active. Restart your terminal (or run `source ~/.zshrc` / `. $PROFILE`) for the aliases to take effect in this session."
+- If the user declines: note that they can run `lean-ctx setup` manually at any time.
+
+**Verification step:** After completing the above, tell the user:
+
+```
+Run `lean-ctx doctor` to verify your setup is complete and both layers are active.
+```
+
+Store `leanCtxInstalled = true` for the Phase 4d summary.
+
+**If the user selects "instructions":**
+
+Show the manual steps:
+
+```
+## Setting up lean-ctx manually
+
+### 1. Install lean-ctx (pick one):
+
+  # Node.js — works on Windows, macOS, and Linux
+  npm install -g lean-ctx-bin
+
+  # Universal installer — Unix / WSL / Git Bash
+  curl -fsSL https://leanctx.com/install.sh | sh
+
+  # Rust / Cargo
+  cargo install lean-ctx
+
+  # macOS / Linux via Homebrew
+  brew tap yvgude/lean-ctx && brew install lean-ctx
+
+### 2. Configure all editors + shell hooks (recommended):
+
+  lean-ctx setup
+
+  This auto-detects your editors (VS Code/Copilot, Cursor, Claude Code, etc.)
+  and adds shell compression aliases for git, npm, docker, gh, and 19 more commands.
+
+### 3. Add to ~/.copilot/mcp-config.json (create if it doesn't exist):
+
+  {
+    "mcpServers": {
+      "lean-ctx": {
+        "command": "lean-ctx",
+        "args": []
+      }
+    }
+  }
+
+### 4. Reload Copilot (restart VS Code or Developer: Reload Window).
+
+### 5. Verify:
+
+  lean-ctx doctor
+```
+
+Store `leanCtxInstalled = false`.
+
+**If the user selects "skip" or declines:** store `leanCtxInstalled = false` and move to Phase 4.
+
+> 💡 **Manage with:** `lean-ctx doctor` to verify setup; `lean-ctx update` to self-update the binary.
 
 ---
 
@@ -731,7 +1064,7 @@ After all files are created, create or update `.github/.preflight-state.json`:
 ```json
 {
   "version": "1.0.0",
-  "pluginVersion": "1.3.0",
+  "pluginVersion": "1.4.2",
   "lastRun": "<ISO 8601 timestamp>",
   "detectedStack": {
     "languages": ["typescript"],
@@ -748,7 +1081,7 @@ After all files are created, create or update `.github/.preflight-state.json`:
 }
 ```
 
-- `pluginVersion` — always set to `CURRENT_PLUGIN_VERSION` ("1.3.0"). This is what future runs compare against to detect version drift and surface config improvements from newer plugin releases.
+- `pluginVersion` — always set to `CURRENT_PLUGIN_VERSION` ("1.4.2"). This is what future runs compare against to detect version drift and surface config improvements from newer plugin releases.
 
 If `.preflight-state.json` already exists, update it (merge `managedFiles`, update `lastRun`, `detectedStack`, and `pluginVersion`).
 
@@ -759,12 +1092,14 @@ Present a capability-focused summary that teaches the user what Copilot now know
 ```
 ## ✅ Setup Complete — Here's What Copilot Now Knows
 
-| What Copilot Learned | How | File |
-|---|---|---|
-| Your project is [framework] + [language] + [package manager] | Repo-wide instructions | `.github/copilot-instructions.md` |
-| [Language] files should use [detected conventions] | Path-scoped rules (only loads for [extension] files) | `.github/instructions/[lang].instructions.md` |
-| Tests use [framework] and live in [test dir] | Path-scoped rules (only loads for test files) | `.github/instructions/tests.instructions.md` |
-| @code-reviewer can review your PRs | Custom agent persona | `.github/agents/code-reviewer.agent.md` |
+| What Copilot Learned | How | File | Manage with |
+|---|---|---|---|
+| Your project is [framework] + [language] + [package manager] | Repo-wide instructions | `.github/copilot-instructions.md` | `/instructions` |
+| [Language] files should use [detected conventions] | Path-scoped rules (only loads for [extension] files) | `.github/instructions/[lang].instructions.md` | `/instructions` |
+| Tests use [framework] and live in [test dir] | Path-scoped rules (only loads for test files) | `.github/instructions/tests.instructions.md` | `/instructions` |
+| @code-reviewer can review your PRs | Custom agent persona | `.github/agents/code-reviewer.agent.md` | `/agent` · `@code-reviewer` |
+| Community skills installed | `gh skill` | `~/.copilot/skills/` | `gh skill list` |
+| Lower token usage for reads and shell output | lean-ctx compresses tool context before it reaches Copilot | `~/.copilot/mcp-config.json` | `lean-ctx doctor` |
 
 ### 💡 Key Concept: These Files Compose
 Copilot loads ALL matching instructions at once. When you edit a `.test.tsx` file,
@@ -785,16 +1120,20 @@ it reads your repo-wide rules + TypeScript rules + test rules — all together, 
 |---|---|---|
 | `@preflight` | Re-scan and update config | When your stack changes or config is stale |
 | `@preflight audit` | Review existing config for drift | After significant code changes or when counts/patterns feel off |
-| `@skill-extractor` | Extract patterns from sessions into skills | After 3-5 coding sessions (needs session-logger hook) |
+| `@skill-extractor` | Extract patterns from sessions into skills | After 3-5 coding sessions — works with session store, even richer with hook |
 | `@skill-extractor evaluate skills` | Review and improve existing skills | Periodically, or when skills feel inaccurate |
 | `@<agent-name>` | <one-line description> | <when to use based on what was created> |
+| `/instructions` | Toggle and verify active instructions | Check which files are loaded, diagnose unexpected behavior |
+| `/agent` | Browse and invoke agents | Find available agents by name or description |
+| `/skills list` | See active skills | Verify installed skills are loaded correctly |
+| `gh skill install <path>` | Install community skills | Add skills from `github/awesome-copilot` |
 
 > **Which agent does what?** `@preflight` manages config files. `@skill-extractor` analyzes session history. Don't use `@preflight` to evaluate sessions — that's `@skill-extractor`'s domain.
 
 > **Tip:** All agents are invoked with `@name` in Copilot chat. Instructions and skills load automatically — no invocation needed.
 ```
 
-Adapt the table rows to match exactly what was created. Only include rows for files that were actually generated. Use the detected stack values throughout. In the "What's Available Now" table, replace the `@<agent-name>` placeholder rows with one row per agent that was actually created — use the agent's name and description from its YAML frontmatter.
+Adapt the table rows to match exactly what was created. Only include rows for files that were actually generated. Use the detected stack values throughout. Include the community skills row only if any community skills were installed in step 2.5. Include the lean-ctx row only if `leanCtxInstalled = true`. In the "What's Available Now" table, replace the `@<agent-name>` placeholder rows with one row per agent that was actually created — use the agent's name and description from its YAML frontmatter.
 
 #### 4e. Optional architecture tour
 
@@ -802,18 +1141,18 @@ After the summary, offer an optional architecture tour via `ask_user`:
 
 ```json
 {
-  "message": "🏗️ **Architecture Tour**\n\nYou've got a working Copilot setup. Want to see how all the pieces fit together — instructions, agents, hooks, skills, and plugins? It's a quick 5-layer overview.\n\n**Without it:** You know *what* was created but not *why* each layer exists.\n**With it:** You understand the full Copilot extensibility model in 2 minutes.",
+  "message": "🏗️ **Architecture Tour**\n\nYou've got a working Copilot setup. Want to see how all the pieces fit together — instructions, agents, skills, hooks, and plugins? A quick overview of the full extensibility model.",
   "requestedSchema": {
     "properties": {
       "tour": {
         "type": "string",
         "title": "Take a quick architecture tour?",
-        "description": "A 2-minute overview of how instructions, agents, hooks, skills, and plugins compose together",
+        "description": "A 2-minute overview of how instructions, agents, skills, hooks, and plugins compose together",
         "oneOf": [
           { "const": "yes", "title": "Yes, show me how it all fits together" },
           { "const": "no", "title": "No thanks, I'm good" }
         ],
-        "default": "no"
+        "default": "yes"
       }
     },
     "required": ["tour"]
@@ -821,15 +1160,31 @@ After the summary, offer an optional architecture tour via `ask_user`:
 }
 ```
 
-If accepted, read `copilot-architecture-class/00-architecture-overview.md` and present a condensed 5-layer overview:
+If accepted, present this condensed overview:
 
-1. **Instructions** — Always loaded, shape every response
-2. **Tools** — Built-in actions + MCP server extensions
-3. **Agents** — Specialist personas invoked with `@name`
-4. **Hooks** — Scripts at lifecycle events (session start, tool calls, session end)
-5. **Plugins** — Bundles for distribution
+```
+## 🏗️ Copilot Extensibility Layers
 
-Include the file system map. Keep the tour under 30 lines. End with: "See `copilot-architecture-class/` for the full deep-dive."
+| Layer | What it is | How to use / manage |
+|---|---|---|
+| **Instructions** | Markdown files that shape every response — repo-wide or path-scoped | Edit directly, verify with `/instructions` |
+| **Agents** | Specialist personas invoked by name (`@agent-name`) | Browse with `/agent`, invoke with `@name` |
+| **Skills** | Reusable capabilities that load automatically when triggered | Install with `gh skill install`, list with `/skills list` |
+| **Hooks** | Scripts at lifecycle events (session start, tool calls, session end) | JSON files in `.github/hooks/`, local-only |
+| **Plugins** | Bundles of agents + skills + hooks for distribution | Install with `copilot plugin install <owner/repo>` |
+| **MCP servers** | External tool integrations (databases, APIs, etc.) | Advanced — configure per-developer |
+
+### Key commands
+| Command | What it does |
+|---|---|
+| `/instructions` | Verify active instructions, check which files load |
+| `/agent` | Browse installed agents |
+| `/skills list` | See active skills |
+| `gh skill install <path>` | Install a community skill from `github/awesome-copilot` |
+| `gh skill search <term>` | Discover community skills |
+
+See `copilot-architecture-class/` for the full deep-dive.
+```
 
 ---
 
@@ -847,6 +1202,24 @@ Structure:
 5. **Testing** — test framework, conventions, how to run tests, where test files live
 6. **Common pitfalls** — any project-specific gotchas you can infer
 7. **Maintenance** — note that this configuration was generated by preflight, and suggest re-running `@preflight` if the project adds new frameworks, languages, or tools not covered by existing instructions
+8. **lean-ctx tool preference** *(include only when `leanCtxConfigured = true` OR `leanCtxInstalled = true`)* — a short section telling Copilot to prefer lean-ctx tools when available:
+
+```markdown
+## lean-ctx Tool Preference
+
+lean-ctx MCP is configured on this project. When lean-ctx tools are available, prefer them over native equivalents — they cache, compress, and deduplicate context, reducing token usage by 60–99% per session:
+
+| Instead of | Use | Benefit |
+|---|---|---|
+| `view` / `read` | `ctx_read` | Caching — re-reads cost ~13 tokens |
+| `glob` / `ls` | `ctx_tree` | Compressed directory maps |
+| `grep` / `search` | `ctx_search` | Filtered, deduplicated matches |
+| `powershell` / `bash` | `ctx_shell` | 90+ compression patterns for CLI output |
+
+If lean-ctx tools are not available (another developer without lean-ctx installed), fall back to native tools transparently.
+```
+
+This section is safe to include in a team-wide file because the conditional wording ("when lean-ctx tools are available") causes Copilot to fall back to native tools for developers who do not have lean-ctx installed.
 
 Target length:30–60 lines. Be specific, not generic. Every line should teach Copilot something it can't infer from the code alone.
 
@@ -860,6 +1233,41 @@ Always wrap in managed markers:
 ### Path-specific instructions (`.github/instructions/*.instructions.md`)
 
 Structure: YAML frontmatter with `applyTo` glob → conventions → patterns to follow → anti-patterns. Target: 15–30 lines. Always include `<!-- managed-by: preflight -->` markers.
+
+### Commit message instructions (`.github/instructions/commit-message.instructions.md`)
+
+This file is loaded via `.vscode/settings.json`, not via `applyTo` glob. **Do NOT include `applyTo` frontmatter.** Include `<!-- managed-by: preflight -->` markers.
+
+Structure:
+1. **Format line** — `<type>(<scope>): <description>` with a short explanation
+2. **Types table** — the standard Conventional Commits types:
+
+   | Type | When to use |
+   |---|---|
+   | `feat` | New feature |
+   | `fix` | Bug fix |
+   | `docs` | Documentation only |
+   | `style` | Formatting, whitespace (no logic change) |
+   | `refactor` | Code restructuring without behavior change |
+   | `test` | Adding or updating tests |
+   | `chore` | Build process, tooling, dependencies |
+   | `perf` | Performance improvements |
+   | `ci` | CI/CD configuration changes |
+   | `build` | Build system changes |
+
+3. **Scopes** — derive from Phase 1 data:
+   - Monorepo: use workspace names from `packages/`, `apps/` directories found in 1d
+   - Single project with multiple top-level `src/` subdirectories: use those directory names (e.g., `api`, `auth`, `ui`, `core`)
+   - If no clear scope structure found: list a few examples based on the detected stack (e.g., `deps`, `config`, `ci`) and note that scopes are optional
+
+4. **Rules** — imperative mood, lowercase subject, no trailing period, ≤72 character subject line, `BREAKING CHANGE:` footer for breaking changes, `!` suffix for breaking type/scope
+
+5. **Examples** — 3 concrete examples using real stack names from Phase 1 detection:
+   - Use framework names, package manager, test framework, CI tool in the examples
+   - E.g., for a TypeScript + Next.js + Vitest project: `feat(auth): add JWT refresh token endpoint`, `test(api): add vitest coverage for user service`, `chore(deps): update next.js to 14.2`
+   - Include one with a body and one with `BREAKING CHANGE` footer
+
+Target: 30–50 lines. Always wrap in managed markers.
 
 ### Custom agents (`.github/agents/*.agent.md`)
 

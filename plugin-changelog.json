@@ -1,19 +1,98 @@
 {
   "_comment": "Maps each plugin release to config improvements. Used by the preflight agent to surface targeted upgrade actions when a version bump is detected between the installed plugin and the version stored in .preflight-state.json.",
   "changelog": {
-    "1.3.0": {
-      "summary": "Migrated hooks from inert JSON config files to SDK-based extensions — hooks now actually execute at session start and on every tool call.",
+    "1.4.2": {
+      "summary": "lean-ctx tool preference instructions — preflight now generates a tool substitution table in copilot-instructions.md when lean-ctx is configured, teaching Copilot to prefer ctx_read, ctx_shell, ctx_tree, and ctx_search over native tools.",
       "configImpacts": [
         {
+          "type": "improvement",
+          "description": "copilot-instructions.md generation now includes a lean-ctx tool preference section (point 8 in the structure) when leanCtxConfigured or leanCtxInstalled is true. The section provides a tool substitution table (view→ctx_read, glob→ctx_tree, grep→ctx_search, powershell→ctx_shell) with conditional fallback wording, making it safe for team repos where not all developers have lean-ctx installed.",
+          "affectedFiles": [".github/copilot-instructions.md"],
+          "recommendation": "Re-run @preflight and regenerate copilot-instructions.md — the updated file will include lean-ctx tool preference instructions so Copilot actually uses the lean-ctx tools, not just has them available."
+        }
+      ]
+    },
+    "1.4.1": {
+      "summary": "Improved lean-ctx setup — expanded detection to include .vscode/mcp.json, shell hook guidance via lean-ctx setup, OS-aware install instructions (npm-first for Windows), and lean-ctx doctor verification step.",
+      "configImpacts": [
+        {
+          "type": "improvement",
+          "description": "lean-ctx detection (Step 1k) now also checks .vscode/mcp.json — users with VS Code workspace MCP configs are no longer incorrectly prompted to set up lean-ctx when it is already configured.",
+          "affectedFiles": [],
+          "recommendation": "No action needed. Detection improvement is automatic on next @preflight run."
+        },
+        {
+          "type": "improvement",
+          "description": "lean-ctx setup (Category 7) now explains and enables the shell hook layer (60-95% CLI savings on git, npm, docker, gh, and 19 more commands) by guiding the user to run lean-ctx setup after the MCP config is added. Install options now show npm first (works on Windows without WSL). lean-ctx doctor verification is prompted after setup.",
+          "affectedFiles": [],
+          "recommendation": "If lean-ctx is installed but you haven't run lean-ctx setup, do so now to enable transparent shell compression alongside the MCP layer."
+        }
+      ]
+    },
+    "1.4.0": {
+      "summary": "lean-ctx MCP server recommendation — preflight now detects whether lean-ctx is configured and offers to add it to the developer's personal MCP config, reducing Copilot token costs by 60–99% per session.",
+      "configImpacts": [
+        {
+          "type": "new_feature",
+          "description": "lean-ctx token cost reduction (Category 7) — preflight now detects lean-ctx in ~/.copilot/mcp-config.json and .mcp.json. If absent, it offers to add the entry or show manual instructions. lean-ctx compresses file reads, shell output, and tool responses before they reach the LLM.",
+          "affectedFiles": [],
+          "recommendation": "Re-run @preflight and review Category 7 to add lean-ctx to your personal MCP config."
+        }
+      ]
+    },
+    "1.3.0": {
+      "summary": "Community skill discovery, copilot init awareness, native command education, and agent slimming. Surfaces github/awesome-copilot skills matched to your stack, detects copilot-init-generated instruction files, adds native command hints after each category, and moves hook templates to the preflight-hooks skill.",
+      "configImpacts": [
+        {
+          "type": "new_feature",
+          "description": "Community skill discovery (Phase 2, step 2.5) — preflight now matches your detected stack against github/awesome-copilot skills and presents a multi-select of recommended skills with gh skill install commands.",
+          "affectedFiles": [],
+          "recommendation": "Re-run @preflight to see community skill recommendations matched to your stack."
+        },
+        {
+          "type": "improvement",
+          "description": "Session learning (Category 5) now leads with the zero-setup path: @skill-extractor works immediately from the session store with no hook required. The session-logger hook is now presented as optional enrichment, not a prerequisite.",
+          "affectedFiles": [".github/hooks/session-logger.json"],
+          "recommendation": "Try @skill-extractor without installing the hook — the session store is always available. Install the hook only if you want richer per-command data."
+        },
+        {
+          "type": "improvement",
+          "description": "Hook templates (session-logger and config-freshness) are now maintained in the preflight-hooks skill rather than inlined in the agent — making them easier to update and reducing agent context size.",
+          "affectedFiles": [".github/hooks/session-logger.json", ".github/hooks/config-freshness.json"],
+          "recommendation": "No action needed. Reinstall hooks via @preflight if you want the latest template."
+        },
+        {
           "type": "breaking_change",
-          "description": "Session-logger and config-freshness hooks were previously generated as .github/hooks/*.json files. These files were never executed by Copilot CLI — the runtime requires .github/extensions/<name>/extension.mjs files using @github/copilot-sdk. Both hooks have been reimplemented as SDK extensions.",
+          "description": "Session-logger and config-freshness hooks were previously generated as .github/hooks/*.json files. These files are never executed by Copilot CLI — the runtime requires .github/extensions/<name>/extension.mjs files using @github/copilot-sdk. Both hooks have been reimplemented as SDK extensions.",
           "affectedFiles": [
             ".github/hooks/session-logger.json",
             ".github/hooks/config-freshness.json",
             ".github/extensions/session-logger/extension.mjs",
             ".github/extensions/config-freshness/extension.mjs"
           ],
-          "recommendation": "Delete .github/hooks/session-logger.json and .github/hooks/config-freshness.json. Re-run @preflight to install the replacement extensions in .github/extensions/. Update managedFiles in .github/.preflight-state.json accordingly."
+          "recommendation": "Delete .github/hooks/session-logger.json and .github/hooks/config-freshness.json if present. Re-run @preflight to install the replacement extensions in .github/extensions/. Update managedFiles in .github/.preflight-state.json accordingly."
+        }
+      ]
+    },
+    "1.2.4":{
+      "summary": "Simplified session-logger hook — postToolUse now captures only phase boundaries (report_intent) and shell commands (powershell), reducing invocations by ~80% while preserving the two highest-signal data points for skill extraction. Removed dead log-tool-call helper scripts that referenced a non-existent env-var hook interface.",
+      "configImpacts": [
+        {
+          "type": "improvement",
+          "description": "Session-logger postToolUse simplified to capture only report_intent (phase boundaries) and powershell (shell commands). Previously logged every tool call — view, read, grep, glob, edit, ask_user, etc. — producing hundreds of low-signal entries per session. The session store (SQL) serves as the primary source for file edit patterns, co-edit clusters, and cross-session repetition. The sessionEnd skill-review threshold is also lowered from 10 to 5 lines to account for reduced log volume.",
+          "affectedFiles": [".github/hooks/session-logger.json"],
+          "recommendation": "Reinstall the session-logger hook via @preflight to get the simplified postToolUse. Existing JSONL logs remain readable — the skill-extractor still works with the old format."
+        }
+      ]
+    },
+    "1.2.3": {
+      "summary": "Added commit message instructions category — scaffolds a dedicated instruction file for VS Code commit generation, keeping commit conventions out of inline suggestions and chat.",
+      "configImpacts": [
+        {
+          "type": "new_feature",
+          "description": "Commit message instructions — creates .github/instructions/commit-message.instructions.md with Conventional Commits rules, project-derived scopes, and concrete examples. Wired via .vscode/settings.json (github.copilot.chat.commitMessageGeneration.instructions) so it loads only when generating commit messages — never during inline suggestions or chat.",
+          "affectedFiles": [".github/instructions/commit-message.instructions.md", ".vscode/settings.json"],
+          "recommendation": "Re-run @preflight and select the new 'Commit message instructions' category (Category 3) to set this up."
         }
       ]
     },
