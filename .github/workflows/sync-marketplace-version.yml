@@ -1,0 +1,44 @@
+name: Sync marketplace version
+
+on:
+  push:
+    branches: [main]
+    paths: [plugin.json]
+
+permissions:
+  contents: write
+
+jobs:
+  sync-version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read plugin version
+        id: plugin
+        run: |
+          version=$(jq -r '.version' plugin.json)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Read marketplace version
+        id: marketplace
+        run: |
+          version=$(jq -r '.plugins[0].version' .github/plugin/marketplace.json)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Update marketplace.json if versions differ
+        if: steps.plugin.outputs.version != steps.marketplace.outputs.version
+        run: |
+          jq --arg v "${{ steps.plugin.outputs.version }}" \
+            '.plugins[0].version = $v' \
+            .github/plugin/marketplace.json > tmp.json \
+            && mv tmp.json .github/plugin/marketplace.json
+
+      - name: Commit updated marketplace.json
+        if: steps.plugin.outputs.version != steps.marketplace.outputs.version
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/plugin/marketplace.json
+          git commit -m "chore(plugin): sync marketplace version to ${{ steps.plugin.outputs.version }}"
+          git push

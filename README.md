@@ -4,12 +4,13 @@
 
 **preflight** is an open-source custom agent that scans your project, recommends a tailored Copilot configuration, and scaffolds all the files interactively. It bundles 1 agent, 5 skills, and optional extensions. Once installed, you describe what you want — the agent scans your codebase, recommends a tailored setup, and scaffolds everything interactively.
 
-> **Current version: 1.5.2** — [changelog](plugin-changelog.json)
+> **Current version: 1.6.0** — [changelog](plugin-changelog.json)
 
-### What's New in v1.5.x
+### What's New in v1.6.x
 
 | Version | Highlights |
 |---|---|
+| **1.6.0** | Self-hosted marketplace for version-tracked plugin updates, automated version sync workflow |
 | **1.5.2** | Scan results confirmation form, user confirmation checkpoints at every key decision, canonical `confirmedStack` data flow, "ask don't assume" principle propagated to generated files |
 | **1.5.1** | Parallelized Phase 1 scanning (3 batched turns instead of 11), sub-agent delegation for large repos |
 | **1.5.0** | Consolidated skill-extractor agent into preflight (single agent), removed dead scripts, cleaned up old JSON hook references to use SDK extensions |
@@ -32,7 +33,7 @@ That's it. No Python, no PAC CLI, no cloud services. Preflight is pure Copilot-n
 
 ## Quick Start
 
-### Option 1: Plugin Install (Recommended)
+### Option 1a: Plugin Install (Recommended)
 
 ```bash
 npm install -g @github/copilot@latest    # skip if already installed
@@ -44,6 +45,21 @@ Then navigate to any project and invoke:
 
 ```
 @preflight
+```
+
+### Option 1b: Marketplace Install
+
+Register the preflight marketplace for browsing and version-tracked updates:
+
+```bash
+copilot plugin marketplace add dynamics-tim/preflight
+copilot plugin install preflight@preflight
+```
+
+Update to the latest version at any time:
+
+```bash
+copilot plugin update preflight
 ```
 
 ### Option 2: Manual Copy
@@ -205,6 +221,9 @@ The core is a single custom agent (`preflight.agent.md`) that owns the entire wo
 ```
 preflight/
 ├── plugin.json                     # Plugin manifest for one-command install
+├── .github/
+│   └── plugin/
+│       └── marketplace.json        # Marketplace registry for version-tracked updates
 ├── agents/
 │   └── preflight.agent.md          # The core agent (entire workflow)
 ├── skills/
@@ -246,9 +265,8 @@ preflight/
 
 ## Roadmap
 
-- **v1.5.2 (current):** Scan results confirmation, user confirmation checkpoints, canonical `confirmedStack` data flow, parallelized scanning, agent consolidation (single agent + 5 skills), community skill discovery, plugin install, presets, audit mode, session learning, native command education.
-- **v2 (planned):** MCP config scaffolding, team-sharing workflows.
-- **v3:** Stack affinity mapping, marketplace integration.
+- **v1.6.0 (current):** Self-hosted marketplace for version-tracked updates, automated version sync workflow, scan results confirmation, user confirmation checkpoints, canonical `confirmedStack` data flow, parallelized scanning, agent consolidation (single agent + 5 skills), community skill discovery, plugin install, presets, audit mode, session learning, native command education.
+- **v2 (planned):** MCP config scaffolding, team-sharing workflows, stack affinity mapping.
 
 ## Contributing
 

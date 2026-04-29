@@ -1,6 +1,23 @@
 {
   "_comment": "Maps each plugin release to config improvements. Used by the preflight agent to surface targeted upgrade actions when a version bump is detected between the installed plugin and the version stored in .preflight-state.json.",
   "changelog": {
+    "1.6.0": {
+      "summary": "Self-hosted marketplace — the preflight repo now doubles as a plugin marketplace, enabling version-tracked installs and one-command updates via copilot plugin update.",
+      "configImpacts": [
+        {
+          "type": "new_feature",
+          "description": "Plugin marketplace — added .github/plugin/marketplace.json so the repo can be registered as a Copilot CLI marketplace. Users who add the marketplace get version-tracked installs and can update with copilot plugin update preflight.",
+          "affectedFiles": [".github/plugin/marketplace.json"],
+          "recommendation": "Register the marketplace: copilot plugin marketplace add dynamics-tim/preflight, then install: copilot plugin install preflight@preflight."
+        },
+        {
+          "type": "improvement",
+          "description": "Automated version sync — a GitHub Actions workflow keeps the marketplace.json plugin version in sync whenever plugin.json is updated on main.",
+          "affectedFiles": [".github/workflows/sync-marketplace-version.yml"],
+          "recommendation": "No action needed. Version sync is automatic on push to main."
+        }
+      ]
+    },
     "1.5.2": {
       "summary": "User confirmation checkpoints — scan results confirmation with correction form, conditional deep scan pattern verification, agent content preview in selection prompt, strengthened uncertainty protocol with must-ask/may-proceed triggers, canonical confirmedStack/confirmedPatterns data flow.",
       "configImpacts": [

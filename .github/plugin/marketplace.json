@@ -1,0 +1,27 @@
+{
+  "name": "preflight",
+  "owner": {
+    "name": "dynamics-tim"
+  },
+  "metadata": {
+    "description": "Copilot configuration scaffolding plugin — scans any codebase and generates an optimized Copilot setup interactively.",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "preflight",
+      "description": "Scans any codebase and scaffolds an optimized GitHub Copilot configuration interactively.",
+      "version": "1.6.0",
+      "source": ".",
+      "author": {
+        "name": "dynamics-tim"
+      },
+      "homepage": "https://github.com/dynamics-tim/preflight",
+      "repository": "https://github.com/dynamics-tim/preflight",
+      "license": "MIT",
+      "keywords": ["copilot", "setup", "scaffolding", "instructions", "agents", "configuration"],
+      "category": "developer-tools",
+      "tags": ["copilot-setup", "code-quality", "productivity"]
+    }
+  ]
+}
