@@ -573,7 +573,7 @@ If the collected impacts include the `2.0.0` breaking change (extensions consoli
 }
 ```
 
-2. If accepted: read the existing state file to get `reminderDaysThreshold` (or 30 if missing). Check for presence of `session-logger/extension.mjs` and `config-freshness/extension.mjs`. Set `hubFeatures` flags: `configFreshness = true` if config-freshness folder existed, `sessionLogger = true` if session-logger folder existed, `guardrails = false` (new feature, user opts in during Phase 3 Cat 6). Read the template from `skills/preflight-hooks/SKILL.md` (under "Template: preflight-hub/extension.mjs") and create `.github/extensions/preflight-hub/extension.mjs`. Delete old extension folders. Rewrite `managedFiles` in state — remove old paths, add `preflight-hub/extension.mjs`. Update `pluginVersion` to `CURRENT_PLUGIN_VERSION`.
+2. If accepted: read the existing state file to get `reminderDaysThreshold` (or 30 if missing). Check for presence of `session-logger/extension.mjs` and `config-freshness/extension.mjs`. Set `hubFeatures` flags: `configFreshness = true` if config-freshness folder existed, `sessionLogger = true` if session-logger folder existed, `guardrails = false` (new feature, user opts in during Phase 3 Cat 6). Read `skills/preflight-hooks/templates/extension.mjs` and copy it to `.github/extensions/preflight-hub/extension.mjs`. Delete old extension folders. Rewrite `managedFiles` in state — remove old paths, add `preflight-hub/extension.mjs`. Update `pluginVersion` to `CURRENT_PLUGIN_VERSION`.
 
 3. After migration completes, **skip the 2.0.0 "breaking" configImpact** from the subsequent apply walkthrough (it was just handled). Continue with remaining impacts.
 
@@ -1175,7 +1175,7 @@ Create files in **dependency groups** — all files within a group can be create
 | **1** | Repo-wide instructions + all path-specific instruction files | Independent of each other |
 | **2** | Commit instructions + `.vscode/settings.json` | Coupled — settings wire the instruction file |
 | **3** | Each custom agent file | Independent of each other, but each requires an immediate post-generation review (see Category 4) before the next group |
-| **4** | `.github/extensions/preflight-hub/extension.mjs` (written once using all accepted `hubFeatures` flags, read template from `skills/preflight-hooks/SKILL.md` under "Template: preflight-hub/extension.mjs") + `.github/preflight-boundaries.yaml` (if guardrails accepted) + `.gitignore` update (`.copilot/` entry if session-logger or session features enabled) | Independent of each other; hub written once from collected flags |
+| **4** | `.github/extensions/preflight-hub/extension.mjs` (written once using all accepted `hubFeatures` flags, read template from `skills/preflight-hooks/templates/extension.mjs`) + `.github/preflight-boundaries.yaml` (if guardrails accepted) + `.gitignore` update (`.copilot/` entry if session-logger or session features enabled) | Independent of each other; hub written once from collected flags |
 | **5 (last)** | `.preflight-state.json` | Depends on all above — needs final `managedFiles` list, `hubFeatures`, `boundaries` |
 
 Within each group, use parallel `create`/`edit` calls. After each group completes, validate immediately:
