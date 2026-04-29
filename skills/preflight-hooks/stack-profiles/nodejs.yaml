@@ -1,8 +1,7 @@
 commands:
-  blocked:
-    # CI envs set CI=true; block npm publish anywhere else
-    - { pattern: '(?<!CI=true\s)npm\s+publish\b', reason: 'npm publish outside CI' }
   warn:
+    # npm publish is high-risk; prompt to confirm. CI pipelines control this via scoped tokens.
+    - { pattern: 'npm\s+publish\b', reason: 'Publishing to npm registry — confirm this is intentional' }
     - { pattern: 'rm\s+-rf\s+node_modules', reason: 'node_modules wipe — confirm intent' }
 paths:
   readOnly: ['package-lock.json']

@@ -1,6 +1,5 @@
 commands:
   blocked:
-    - { pattern: 'git\s+push.*--force(?!-with-lease)', reason: 'Force push without lease' }
     - { pattern: 'git\s+filter-branch',                reason: 'History rewrite' }
     - { pattern: 'git\s+reset\s+--hard\s+origin/(main|master|develop)', reason: 'Hard reset on protected branch' }
   warn:

@@ -92,11 +92,13 @@ function parseBoundariesYaml(text) {
         // array item: "- value" or "- { pattern: x, reason: y }"
         const item = line.trim().replace(/^-\s*/, "");
         if (item.startsWith("{")) {
-          const pm = item.match(/pattern:\s*['"]?([^,'"]+)['"]?/);
-          const rm = item.match(/reason:\s*['"]?([^}'"]+)['"]?/);
-          if (pm) {
+          const pm = item.match(/pattern:\s*(?:['"]([^'"]+)['"]|([^,}]+))/);
+          const rm = item.match(/reason:\s*(?:['"]([^'"]+)['"]|([^}]+))/);
+          const pat = (pm ? (pm[1] ?? pm[2] ?? "") : "").trim();
+          const rsn = (rm ? (rm[1] ?? rm[2] ?? "") : "").trim();
+          if (pat) {
             if (!Array.isArray(out[ctx][subCtx])) out[ctx][subCtx] = [];
-            out[ctx][subCtx].push({ pattern: pm[1].trim(), reason: rm ? rm[1].trim() : "" });
+            out[ctx][subCtx].push({ pattern: pat, reason: rsn });
           }
         } else if (item) {
           if (!Array.isArray(out[ctx][subCtx])) out[ctx][subCtx] = [];
@@ -151,10 +153,11 @@ async function onSessionStartComposed(input, invocation, sessionRef) {
 
 // ---------- onPreToolUse — guardrails ----------
 async function onPreToolUseGuard(input, invocation, sessionRef) {
-  if (!policy || policy.mode === "dryrun") return null;
+  if (!policy) return null;
   const decision = evaluatePolicy(policy, input);
   // decision: { kind: "allow"|"deny"|"ask", rule?: string, reason?: string }
   safeAppend(POLICY_LOG, JSON.stringify({ ts: ts(), tool: input.toolName, ...decision }));
+  if (policy.mode === "dryrun") return null; // log decisions only — no enforcement
   if (decision.kind === "deny") {
     if (policy.mode === "warn") return null; // warn-only: log but don't block
     return {
