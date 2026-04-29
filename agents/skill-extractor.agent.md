@@ -7,6 +7,9 @@ tools:
   - search
   - execute
   - vscode/askQuestions
+user-invocable: false
+argument-hint: "Extract, evaluate, or clean up skills based on session activity. For extraction, I analyze session logs to identify repeatable patterns and generate new skills. For evaluation, I audit existing skills against session data to refine triggers and workflows. For cleanup, I flag stale or unused skills for archiving. Always start with the session store for cross-session patterns; use JSONL for fine-grained sequence analysis if available."
+model: Claude Sonnet 4.6 (copilot)
 ---
 
 # Skill Extractor Agent
@@ -93,7 +96,7 @@ Before proceeding with any workflow, assess available data:
    - **Fewer than 3 sessions:** Tell the user more sessions are needed for reliable patterns.
 
 2. **Check JSONL for extraction workflows.** Read `.copilot/session-activity.jsonl` if extraction is requested.
-   - **If missing:** Extraction still works at a reduced level using session store data (file patterns and user requests), but fine-grained tool sequences require the session-logger hook. Offer to install it.
+   - **If missing:** Extraction still works at a reduced level using session store data (file patterns and user requests), but fine-grained tool sequences require the session-logger extension. Offer to install it.
    - **If present but sparse** (fewer than 10 tool calls): Suggest accumulating more data.
    - **If sufficient:** Use hybrid approach — session store for cross-session patterns, JSONL for tool sequences.
 

@@ -141,7 +141,7 @@ Use `glob` to check for:
 - `.github/instructions/*.instructions.md`
 - `.github/agents/*.agent.md`
 - `.github/skills/`
-- `.github/hooks/`
+- `.github/extensions/`
 - `.github/extensions/`
 - `.copilot/`
 - `AGENTS.md`
@@ -294,7 +294,7 @@ If the project already has substantial Copilot configuration, use `ask_user` to 
 ```
 
 - If the user picks **"audit"**, run the audit workflow:
-  1. **Validate** — Read all managed files (those with `<!-- managed-by: preflight -->` markers). Check YAML frontmatter parses, required fields present, markers balanced, hook JSON valid.
+  1. **Validate** — Read all managed files (those with `<!-- managed-by: preflight -->` markers). Check YAML frontmatter parses, required fields present, markers balanced, extension `.mjs` syntax valid.
   2. **Count heuristic** — While reading instruction files, scan for specific numeric counts (regex: `\b\d+\s+(controller|builder|class|service|handler|endpoint|route|component|model|test|file)s?\b`). Each match is a staleness signal — these numbers were accurate at generation time but drift immediately. Flag each occurrence as "likely stale count" with the file name and matched text.
   3. **Compare** — Diff current Phase 1 scan results against stored `detectedStack` in `.preflight-state.json`. Identify drift: new frameworks added, old ones removed, version changes.
   4. **Report** — Present findings with evidence: "Your config references React but package.json now shows Astro 4.1. Tests instructions reference Jest but vitest is now in devDependencies." Also list any stale-count flags: "Found '18 controllers' in copilot-instructions.md — replace with a relative description so it stays accurate as the codebase grows."
@@ -1170,7 +1170,7 @@ If accepted, present this condensed overview:
 | **Instructions** | Markdown files that shape every response — repo-wide or path-scoped | Edit directly, verify with `/instructions` |
 | **Agents** | Specialist personas invoked by name (`@agent-name`) | Browse with `/agent`, invoke with `@name` |
 | **Skills** | Reusable capabilities that load automatically when triggered | Install with `gh skill install`, list with `/skills list` |
-| **Hooks** | Scripts at lifecycle events (session start, tool calls, session end) | JSON files in `.github/hooks/`, local-only |
+| **Extensions** | Scripts at lifecycle events (session start, tool calls, session end) | ES module files in `.github/extensions/<name>/extension.mjs`, loaded via `@github/copilot-sdk` |
 | **Plugins** | Bundles of agents + skills + hooks for distribution | Install with `copilot plugin install <owner/repo>` |
 | **MCP servers** | External tool integrations (databases, APIs, etc.) | Advanced — configure per-developer |
 
@@ -1310,6 +1310,6 @@ Structure: YAML frontmatter (`name`, `description`, `tools`) → identity paragr
     - End with a transitional sentence connecting to the next category
 17. **Use readable schema fields.** Titles should be human-friendly questions or actions, not technical labels. Bad: `"title": "create"`. Good: `"title": "Create repository-wide instructions"`. Add `description` fields that explain what happens when the user selects this option.
 18. **Keep enum labels self-documenting.** Each option in an enum or multi-select array should read as a complete thought: `"typescript.instructions.md — TypeScript conventions (*.ts, *.tsx)"`, not just `"typescript.instructions.md"`.
-19. **Consistent emoji palette.** Use exactly one emoji per category heading: 📋 instructions, 📂 path-specific, 🤖 agents, ⚡ hooks, 🔄 maintenance, 🔍 deep scan, 🏗️ architecture tour. Do not scatter emojis elsewhere in the message.
+19. **Consistent emoji palette.** Use exactly one emoji per category heading: 📋 instructions, 📂 path-specific, 🤖 agents, ⚡ extensions, 🔄 maintenance, 🔍 deep scan, 🏗️ architecture tour. Do not scatter emojis elsewhere in the message.
 20. **Progressive connection.** Open each category's message by connecting it to the previous one (e.g., "You just set up repo-wide standards. Now let's add file-type-specific rules."). This creates narrative flow.
 21. **Evidence-first recommendations.** Every Phase 3 `ask_user` message MUST cite specific scan evidence from Phase 1. Replace generic placeholders (`<detected frameworks>`) with real data: framework names and versions from manifests (e.g., "React 18.2"), package manager name, test framework name, directory names found. Do NOT fabricate file counts or statistics — only cite facts that Phase 1 actually collected.

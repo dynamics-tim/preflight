@@ -2,10 +2,10 @@
 .SYNOPSIS
   Rich session activity logger. Appends detailed JSONL per tool call.
 .DESCRIPTION
-  Provides richer data than the inline hook (includes path + args summary).
-  Replace the postToolUse inline command in session-logger.json with:
-    "powershell": "& .github/hooks/log-tool-call.ps1"
-  to get detailed logging.
+  Provides richer data for session analysis (includes path + args summary).
+  In the SDK extension model, call this logic from onPostToolUse in extension.mjs
+  instead of using the environment-variable-based approach shown here.
+  The canonical extension template is in skills/preflight-hooks/SKILL.md.
 #>
 
 $ErrorActionPreference = "SilentlyContinue"

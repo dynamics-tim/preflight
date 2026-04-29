@@ -82,8 +82,8 @@ You should see some or all of these (depending on what you confirmed):
 | `.github/instructions/*.instructions.md` | Language/path-specific rules |
 | `.github/agents/*.agent.md` | Custom agent profiles |
 | `.github/.preflight-state.json` | State tracking for idempotent re-runs |
-| `.github/hooks/config-freshness.json` | Reminds you when config is stale |
-| `.github/hooks/session-logger.json` | Captures tool usage for skill extraction |
+| `.github/extensions/config-freshness/extension.mjs` | Reminds you when config is stale |
+| `.github/extensions/session-logger/extension.mjs` | Captures tool usage for skill extraction |
 
 ---
 
@@ -207,7 +207,7 @@ preflight/
 │   │   └── scan.ps1                # Windows fast-scan helper
 │   ├── preflight-deep-scan/        # On-demand deep code analysis
 │   │   └── SKILL.md
-│   ├── preflight-hooks/            # Hook templates (session-logger, config-freshness)
+│   ├── preflight-hooks/            # Extension templates (session-logger, config-freshness)
 │   │   └── SKILL.md
 │   ├── skill-extractor/            # Session pattern analysis & skill generation
 │   │   ├── SKILL.md

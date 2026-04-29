@@ -36,7 +36,7 @@ Derived from this project's top-level structure:
 |---|---|
 | `agent` | Files in `agents/` or `.github/agents/` |
 | `skill` | Files in `skills/` |
-| `hook` | Files in `.github/hooks/` |
+| `hook` | Files in `.github/extensions/` |
 | `docs` | README, `copilot-architecture-class/`, reference docs |
 | `plugin` | `plugin.json`, `plugin-changelog.json` |
 | `scripts` | `.sh` / `.ps1` script files |
@@ -49,7 +49,7 @@ Scope is optional for commits that touch multiple areas simultaneously.
 - Use imperative mood: "add" not "added" or "adds"
 - Body explains *why*, not *what* (the diff shows what)
 - Reference issues in footer: `Closes #42`
-- `BREAKING CHANGE:` footer required for any change that alters the agent workflow, skill interface, or hook JSON schema
+- `BREAKING CHANGE:` footer required for any change that alters the agent workflow, skill interface, or extension hook schema
 
 ## Examples
 

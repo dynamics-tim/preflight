@@ -61,7 +61,7 @@ ORDER BY s.updated_at DESC LIMIT 10;
 
 ### JSONL Activity Log (Enrichment)
 
-Located at `.copilot/session-activity.jsonl`. Requires session-logger hook installation.
+Located at `.copilot/session-activity.jsonl`. Requires session-logger extension installation.
 Provides fine-grained tool call sequences and phase boundaries not available in the session store.
 
 **Use JSONL for:** phase boundary analysis via `report_intent`, command argument patterns via `powershell`. Only these two tool types are logged by the simplified hook.
@@ -75,9 +75,9 @@ Each line in `.copilot/session-activity.jsonl` is a JSON object.
 **With command**: `{"ts":"...","tool":"powershell","cmd":"npm test"}`
 **Boundaries**: `{"ts":"...","event":"session_start","cwd":"project-name"}` / `{"event":"session_end"}`
 
-If the JSONL log is missing, the session-logger hook needs to be installed for tool-level extraction.
+If the JSONL log is missing, the session-logger extension needs to be installed for tool-level extraction.
 The session store is still available for evaluation and cleanup workflows.
-Run `@preflight` to scaffold the hook.
+Run `@preflight` to scaffold the extension.
 
 ## Fields Reference
 

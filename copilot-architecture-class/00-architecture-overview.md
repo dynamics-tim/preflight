@@ -55,11 +55,11 @@ flowchart TD
 
     subgraph Hooks["Layer 4: Lifecycle & Automation"]
         direction LR
-        HookStart["sessionStart"]
-        HookPrompt["userPromptSubmitted"]
-        HookPre["preToolUse"]
-        HookPost["postToolUse"]
-        HookEnd["sessionEnd"]
+        HookStart["onSessionStart"]
+        HookPrompt["onUserPromptSubmitted"]
+        HookPre["onPreToolUse"]
+        HookPost["onPostToolUse"]
+        HookEnd["onSessionEnd"]
     end
 
     Hooks -.->|"intercept & control"| Tools
@@ -95,7 +95,7 @@ flowchart TD
 | **Skills** | Defines reusable, self-contained capabilities Copilot can invoke | Package domain knowledge or multi-step workflows | `.github/skills/<name>/SKILL.md`, `~/.copilot/skills/` |
 | **Tools** | Built-in actions Copilot can take (read files, run commands, edit code) | Always available — core interaction with the codebase | Built-in; no file needed |
 | **MCP Servers** | Extends Copilot's tool set with external APIs and services via the Model Context Protocol | Connect to databases, APIs, third-party systems | `.mcp.json` (project), `~/.copilot/mcp-config.json` (personal) |
-| **Hooks** | Runs scripts at lifecycle events to intercept, validate, or modify behavior | Enforce policies, auto-format, gate dangerous operations | `.github/hooks/*.json` |
+| **Extensions** | Runs scripts at lifecycle events using `@github/copilot-sdk` | Enforce policies, log sessions, surface reminders | `.github/extensions/<name>/extension.mjs` |
 | **Sub-agents** | Built-in specialist agents launched by the main agent for parallel work | Offload exploration, testing, code review to focused workers | Invoked via `task` tool; no file needed |
 | **Custom Agents** | User-defined agent profiles with specialized instructions and tool access | Create domain experts (e.g., "database agent", "security reviewer") | `.github/agents/*.agent.md`, `~/.copilot/agents/` |
 | **Plugins** | Bundles that package skills, hooks, agents, and MCP configs together | Distribute a complete Copilot extension as a reusable unit | Plugin package definition |
@@ -118,7 +118,7 @@ The **main agent** orchestrates the session. It can delegate work to **sub-agent
 
 ### Layer 4: Lifecycle & Automation
 
-**Hooks** fire at defined lifecycle events: `sessionStart`, `userPromptSubmitted`, `preToolUse`, `postToolUse`, and `sessionEnd`. Each hook can run a script that inspects context, modifies behavior, blocks operations, or performs side effects. Use hooks to enforce policies (e.g., block shell commands matching a pattern), auto-format output, or integrate with external approval systems.
+**Extensions** (`.github/extensions/<name>/extension.mjs`) fire at defined lifecycle events using the `@github/copilot-sdk`. Call `joinSession({ hooks, tools })` at the top level and provide callback functions for the events you care about: `onSessionStart`, `onUserPromptSubmitted`, `onPreToolUse`, `onPostToolUse`, `onSessionEnd`, and `onErrorOccurred`. The SDK is auto-resolved — no `npm install` needed. Use extensions to enforce policies (e.g., block tool calls matching a pattern), log session data for skill extraction, or surface reminders via `session.log()`.
 
 ### Layer 5: Packaging & Distribution
 
@@ -138,8 +138,9 @@ The **main agent** orchestrates the session. It can delegate work to **sub-agent
 ├── skills/
 │   └── skill-name/
 │       └── SKILL.md                     # Skill definition + metadata
-├── hooks/
-│   └── *.json                           # Hook configurations (lifecycle scripts)
+├── extensions/
+│   └── <name>/
+│       └── extension.mjs                # Extension entry point (SDK-based lifecycle hooks)
 ├── copilot-architecture-class/
 │   └── (learning materials like this file)
 └── workflows/
@@ -164,7 +165,7 @@ Project root:
 1. **Load instructions** — Merge custom instructions from `.github/copilot-instructions.md`, matching `*.instructions.md` files, `~/.copilot/copilot-instructions.md`, and `AGENTS.md` into the system context.
 2. **Evaluate skills** — Check the prompt against available skill definitions (`SKILL.md` files) to determine if a specialized skill should be activated.
 3. **Select tools** — Identify which built-in tools and MCP server tools are relevant to the request.
-4. **Fire `userPromptSubmitted` hook** — Run any configured hook scripts that intercept the submitted prompt (can modify or gate the request).
+4. **Fire `onUserPromptSubmitted` extension hook** — Run any configured extension callbacks that intercept the submitted prompt (can modify or gate the request).
 5. **Execute with tools** — The LLM generates tool calls; each fires `preToolUse` (can block or modify) → tool execution → `postToolUse` (can inspect results).
 6. **Delegate to sub-agents** — If the task benefits from parallelism or specialization, the main agent launches sub-agents with custom agent profiles providing focused instructions.
-7. **Return result** — Final output is assembled and returned to the user. The `sessionEnd` hook fires when the session concludes.
+7. **Return result** — Final output is assembled and returned to the user. The `onSessionEnd` extension hook fires when the session concludes.

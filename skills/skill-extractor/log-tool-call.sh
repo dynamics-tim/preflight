@@ -3,12 +3,13 @@ set -euo pipefail
 
 # ── Rich Session Activity Logger ─────────────────────────────────────────────
 # Appends a detailed JSONL entry for each tool call.
-# Provides richer data than the inline hook (includes path + args summary).
+# Provides richer data for session analysis (includes path + args summary).
 #
-# Usage: Replace the postToolUse inline command in session-logger.json with:
-#   "bash": "bash .github/hooks/log-tool-call.sh 2>/dev/null || true"
+# In the SDK extension model, use the onPostToolUse callback in extension.mjs
+# instead of this environment-variable-based approach.
+# The canonical extension template is in skills/preflight-hooks/SKILL.md.
 #
-# Environment variables (provided by Copilot hooks):
+# Environment variables (if invoked from a shell context):
 #   COPILOT_TOOL_NAME      — name of the tool that was called
 #   COPILOT_TOOL_ARGS      — JSON string of tool arguments
 

@@ -16,8 +16,8 @@
     ".github/instructions/markdown.instructions.md",
     ".github/instructions/hooks.instructions.md",
     ".github/instructions/commit-message.instructions.md",
-    ".github/hooks/session-logger.json",
-    ".github/hooks/config-freshness.json"
+    ".github/extensions/session-logger/extension.mjs",
+    ".github/extensions/config-freshness/extension.mjs"
   ],
   "reminderDaysThreshold": 30
 }

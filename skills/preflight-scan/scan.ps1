@@ -284,7 +284,7 @@ function Detect-CopilotConfig {
     pathInstructions    = (Test-Path (Join-Path $Dir ".github\instructions") -PathType Container)
     agents              = (Test-Path (Join-Path $Dir ".github\agents") -PathType Container)
     skills              = (Test-Path (Join-Path $Dir ".github\skills") -PathType Container)
-    hooks               = (Test-Path (Join-Path $Dir ".github\hooks") -PathType Container)
+    hooks               = (Test-Path (Join-Path $Dir ".github\extensions") -PathType Container)
     agentsMd            = ((Test-Path (Join-Path $Dir "AGENTS.md")) -or (Test-Path (Join-Path $Dir "CLAUDE.md")))
   }
 

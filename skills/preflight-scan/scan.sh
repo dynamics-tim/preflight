@@ -271,7 +271,7 @@ detect_copilot_config() {
   [ -d "$DIR/.github/instructions" ] && pi=true
   [ -d "$DIR/.github/agents" ] && ag=true
   [ -d "$DIR/.github/skills" ] && sk=true
-  [ -d "$DIR/.github/hooks" ] && hk=true
+  [ -d "$DIR/.github/extensions" ] && hk=true
   [ -f "$DIR/AGENTS.md" ] || [ -f "$DIR/CLAUDE.md" ] && amd=true
   [ -d "$DIR/.copilot" ] && ci=true  # .copilot/ dir counts as config
 

@@ -1,9 +1,9 @@
 ---
 name: preflight-authoring
 description: |
-  Authoring skill scripts, hook configs, and instruction files for the preflight
+  Authoring skill scripts, extension files, and instruction files for the preflight
   plugin project itself. Use ONLY when creating or updating files under `skills/`,
-  `.github/hooks/`, or `.github/instructions/` within the
+  `.github/extensions/`, or `.github/instructions/` within the
   preflight repository. Not for other projects that consume preflight output.
   Triggers: "create skill script", "add helper script pair", "script parity",
   "create hook", "add hook config", "configure hook event", "guardrails hook",
@@ -14,8 +14,8 @@ description: |
 # Preflight Authoring
 
 Guides creation and maintenance of the three core file types in the preflight
-plugin project: skill helper scripts (`.sh` + `.ps1` pairs), hook configuration
-JSON, and path-specific instruction files. Each section below covers one domain.
+plugin project: skill helper scripts (`.sh` + `.ps1` pairs), SDK extension files
+(`.github/extensions/<name>/extension.mjs`), and path-specific instruction files. Each section below covers one domain.
 
 ---
 
