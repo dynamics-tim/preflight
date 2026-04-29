@@ -15,6 +15,11 @@ const POLICY_LOG   = `${COPILOT_DIR}/policy-decisions.jsonl`;
 const ts = () => new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
 const readJSON = (p) => { try { return JSON.parse(readFileSync(p, "utf-8")); } catch { return null; } };
 const safeAppend = (p, line) => { try { mkdirSync(COPILOT_DIR, { recursive: true }); appendFileSync(p, line + "\n", "utf-8"); } catch {} };
+function describeAttempt(input) {
+    const a = input.toolArgs ?? {};
+    const desc = a.description || a.command && String(a.command).slice(0, 80).replace(/\n/g, " ") || a.path || a.pattern || a.url || a.intent || "";
+    return desc ? `[${desc}] ` : "";
+}
 
 // Minimal YAML reader — only handles the documented schema. NOT a general parser.
 // Recognizes: top-level keys, nested maps one level deep, arrays of strings,
@@ -118,18 +123,19 @@ async function onSessionStartComposed(input, invocation, sessionRef) {
 async function onPreToolUseGuard(input, invocation, sessionRef) {
     if (!policy) return;
     const decision = evaluatePolicy(policy, input);
+    const desc = describeAttempt(input);
     // decision: { kind: "allow"|"deny"|"ask", rule?: string, reason?: string }
-    safeAppend(POLICY_LOG, JSON.stringify({ ts: ts(), tool: input.toolName, ...decision }));
+    safeAppend(POLICY_LOG, JSON.stringify({ ts: ts(), tool: input.toolName, desc: desc.slice(1, -2) || undefined, ...decision }));
     if (policy.mode === "dryrun") return; // log decisions only — no enforcement
     if (decision.kind === "deny") {
         if (policy.mode === "warn") return; // warn-only: log but don't block
         return {
             permissionDecision: "deny",
-            permissionDecisionReason: `${decision.reason ?? "Blocked by preflight policy"} (rule: ${decision.rule ?? "n/a"}). Edit ${BOUNDARIES} or run @preflight tune-boundaries to adjust.`,
+            permissionDecisionReason: `${desc}${decision.reason ?? "Blocked by preflight policy"} (rule: ${decision.rule ?? "n/a"}). Edit ${BOUNDARIES} or run @preflight tune-boundaries to adjust.`,
         };
     }
     if (decision.kind === "ask" && policy.mode === "enforce") {
-        return { permissionDecision: "ask", permissionDecisionReason: decision.reason ?? "Confirmation required by preflight policy" };
+        return { permissionDecision: "ask", permissionDecisionReason: `${desc}${decision.reason ?? "Confirmation required by preflight policy"}` };
     }
 }
 

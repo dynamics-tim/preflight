@@ -1,6 +1,17 @@
 {
   "_comment": "Maps each plugin release to config improvements. Used by the preflight agent to surface targeted upgrade actions when a version bump is detected between the installed plugin and the version stored in .preflight-state.json.",
   "changelog": {
+    "2.1.0": {
+      "summary": "Guardrails UX improvement — deny/ask messages now include a description of the blocked attempt for instant context.",
+      "configImpacts": [
+        {
+          "type": "improvement",
+          "description": "Guardrails denial and confirmation prompts now include a [description] prefix showing what was attempted (e.g. command description, file path, or search pattern). The policy audit log also records this description for richer history.",
+          "affectedFiles": [".github/extensions/preflight-hub/extension.mjs"],
+          "recommendation": "Re-run @preflight or copy the updated template to get the improved messages. Existing boundaries YAML is unchanged."
+        }
+      ]
+    },
     "2.0.0": {
       "summary": "Agent guardrails + unified preflight-hub extension. Fixes hook overwrite bug where only one onSessionStart handler fired. New onPreToolUse boundary system via .github/preflight-boundaries.yaml with strict/balanced/permissive presets, stack-aware defaults, and @preflight tune-boundaries for data-driven policy tuning.",
       "configImpacts": [
