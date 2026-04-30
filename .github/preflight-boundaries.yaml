@@ -26,7 +26,7 @@ commands:
     - { pattern: 'git\s+clean\s+-fdx', reason: 'Clean including ignored files' }
 
 paths:
-  protected: ['.env', '.env.*', 'secrets/**', '**/credentials.*', '**/.git/**']
+  protected: ['.env', '.env.*', 'secrets/**', '**/credentials.*', '**/.git/**', '.github/preflight-boundaries.yaml']
   readOnly:  []
   sandbox:   []               # if non-empty: writes only allowed inside
 

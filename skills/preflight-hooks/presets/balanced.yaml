@@ -14,7 +14,7 @@ commands:
   warn:
     - { pattern: 'sudo\b', reason: 'Privilege escalation — review carefully' }
 paths:
-  protected: ['.env', '.env.*', 'secrets/**', '**/credentials.*', '**/.git/**']
+  protected: ['.env', '.env.*', 'secrets/**', '**/credentials.*', '**/.git/**', '.github/preflight-boundaries.yaml']
   readOnly: []
   sandbox: []
 network:
