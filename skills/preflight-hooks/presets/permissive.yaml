@@ -12,7 +12,7 @@ commands:
     - { pattern: 'rm\s+-rf', reason: 'Recursive delete — allowed but logged' }
     - { pattern: 'git\s+push.*--force', reason: 'Force push — allowed but logged' }
 paths:
-  protected: ['.env', 'secrets/**']
+  protected: ['.env', 'secrets/**', '.github/preflight-boundaries.yaml', '.github/extensions/preflight-hub/**', '.copilot/policy-decisions.jsonl']
   readOnly: []
   sandbox: []
 network:

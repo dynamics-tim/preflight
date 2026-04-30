@@ -32,6 +32,9 @@ paths:
     - '~/.ssh/**'
     - '~/.aws/**'
     - '~/.azure/**'
+    - '.github/preflight-boundaries.yaml'
+    - '.github/extensions/preflight-hub/**'
+    - '.copilot/policy-decisions.jsonl'
   readOnly: []
   sandbox: []
 network:

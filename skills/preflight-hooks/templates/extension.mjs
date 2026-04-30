@@ -98,7 +98,13 @@ function parseBoundariesYaml(text) {
 // ---------- feature loaders ----------
 const state      = readJSON(STATE) || {};
 const features   = state.hubFeatures || {};
-const policy     = features.guardrails && existsSync(BOUNDARIES)
+
+// Guardrails activate when the boundaries file exists — not from a state flag.
+// The boundaries file itself is a protected path, so the AI cannot delete or modify it.
+// This means .preflight-state.json stays writable (for lastRun, confirmedStack, etc.)
+// without risk of the AI flipping guardrails off.
+const boundariesExist = existsSync(BOUNDARIES);
+const policy     = boundariesExist
     ? parseBoundariesYaml(readFileSync(BOUNDARIES, "utf-8"))
     : null;
 
@@ -129,7 +135,7 @@ async function onSessionStartComposed(input, invocation, sessionRef) {
         } catch {}
     }
     // 3. guardrails — log policy in effect
-    if (features.guardrails && policy) {
+    if (policy) {
         await sessionRef.log(`[preflight] Guardrails active: preset=${policy.preset} mode=${policy.mode}`, { level: "info" });
     }
     // 4. plugin version check
@@ -293,7 +299,7 @@ async function onSessionEndFinalize() {
 const session = await joinSession({
     hooks: {
         onSessionStart: (i, inv) => onSessionStartComposed(i, inv, session),
-        onPreToolUse:   features.guardrails ? (i, inv) => onPreToolUseGuard(i, inv, session) : undefined,
+        onPreToolUse:   boundariesExist ? (i, inv) => onPreToolUseGuard(i, inv, session) : undefined,
         onPostToolUse:  features.sessionLogger ? onPostToolUseLog : undefined,
         onSessionEnd:   features.sessionLogger ? onSessionEndFinalize : undefined,
     },

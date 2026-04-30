@@ -14,7 +14,7 @@ commands:
   warn:
     - { pattern: 'sudo\b', reason: 'Privilege escalation — review carefully' }
 paths:
-  protected: ['.env', '.env.*', 'secrets/**', '**/credentials.*', '**/.git/**', '.github/preflight-boundaries.yaml']
+  protected: ['.env', '.env.*', 'secrets/**', '**/credentials.*', '**/.git/**', '.github/preflight-boundaries.yaml', '.github/extensions/preflight-hub/**', '.copilot/policy-decisions.jsonl']
   readOnly: []
   sandbox: []
 network:

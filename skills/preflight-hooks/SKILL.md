@@ -44,7 +44,8 @@ When scaffolding `.github/extensions/preflight-hub/extension.mjs` for a user pro
 **Key invariants:**
 
 - Single `joinSession()` call with all hooks composed in one registration
-- `hubFeatures` flags in `.preflight-state.json` toggle behaviors at runtime
+- Guardrails activate when `.github/preflight-boundaries.yaml` exists — NOT from `hubFeatures.guardrails`. This prevents the AI from disabling guardrails by editing `.preflight-state.json` while the boundaries file (a protected path) remains untouchable.
+- `hubFeatures` flags in `.preflight-state.json` toggle behaviors at runtime (except guardrails — see above)
 - YAML parsing uses `split(/\r?\n/)` to handle both LF and CRLF line endings
 - Hook functions return `undefined` (bare `return`) for "no decision", never `null`
 - All file I/O wrapped in `try/catch` — the extension must never throw
@@ -86,7 +87,7 @@ commands:
   warn: []                    # match → log but allow
 
 paths:
-  protected: ['.env', '.env.*', 'secrets/**', '**/credentials.*', '**/.git/**']
+  protected: ['.env', '.env.*', 'secrets/**', '**/credentials.*', '**/.git/**', '.github/preflight-boundaries.yaml', '.github/extensions/preflight-hub/**', '.copilot/policy-decisions.jsonl']
   readOnly:  []
   sandbox:   []               # if non-empty: writes only allowed inside
 
