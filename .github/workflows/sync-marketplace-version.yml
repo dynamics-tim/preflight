@@ -26,6 +26,12 @@ jobs:
           version=$(jq -r '.plugins[0].version' .github/plugin/marketplace.json)
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
+      - name: Read agent version
+        id: agent
+        run: |
+          version=$(grep -oP 'CURRENT_PLUGIN_VERSION = "\K[^"]+' agents/preflight.agent.md)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
       - name: Update marketplace.json if versions differ
         if: steps.plugin.outputs.version != steps.marketplace.outputs.version
         run: |
@@ -34,11 +40,17 @@ jobs:
             .github/plugin/marketplace.json > tmp.json \
             && mv tmp.json .github/plugin/marketplace.json
 
-      - name: Commit updated marketplace.json
-        if: steps.plugin.outputs.version != steps.marketplace.outputs.version
+      - name: Update agent version if versions differ
+        if: steps.plugin.outputs.version != steps.agent.outputs.version
+        run: |
+          sed -i "s/CURRENT_PLUGIN_VERSION = \"[^\"]*\"/CURRENT_PLUGIN_VERSION = \"${{ steps.plugin.outputs.version }}\"/" \
+            agents/preflight.agent.md
+
+      - name: Commit synced versions
+        if: steps.plugin.outputs.version != steps.marketplace.outputs.version || steps.plugin.outputs.version != steps.agent.outputs.version
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .github/plugin/marketplace.json
-          git commit -m "chore(plugin): sync marketplace version to ${{ steps.plugin.outputs.version }}"
+          git add .github/plugin/marketplace.json agents/preflight.agent.md
+          git commit -m "chore(plugin): sync version to ${{ steps.plugin.outputs.version }}"
           git push

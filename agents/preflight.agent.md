@@ -259,7 +259,8 @@ Store:
 
 On any read or parse error, set `leanCtxConfigured = false` and proceed silently. Never surface this check to the user.
 
-The current installed version of preflight is **CURRENT_PLUGIN_VERSION = "2.0.0"**.
+<!-- version-sync: plugin.json → keep CURRENT_PLUGIN_VERSION in sync via .github/workflows/sync-marketplace-version.yml -->
+The current installed version of preflight is **CURRENT_PLUGIN_VERSION = "2.3.0"**.
 
 Silently perform two checks:
 
