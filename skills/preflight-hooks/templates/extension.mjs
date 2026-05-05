@@ -153,7 +153,7 @@ async function checkPluginVersion(sessionRef) {
         const cacheMaxAge = 24 * 60 * 60 * 1000;
         if (cache && cache.checkedAt && (Date.now() - new Date(cache.checkedAt).getTime()) < cacheMaxAge) {
             if (cache.remoteVersion && semverNewer(cache.remoteVersion, local)) {
-                await sessionRef.log(`[preflight] v${cache.remoteVersion} available (you have v${local}) — run: copilot plugin update preflight`, { level: "warning" });
+                await sessionRef.log(`[preflight] v${cache.remoteVersion} available (you have v${local}) — run @preflight for a guided 1-click update`, { level: "warning" });
             }
             return;
         }
@@ -167,7 +167,7 @@ async function checkPluginVersion(sessionRef) {
         mkdirSync(COPILOT_DIR, { recursive: true });
         writeFileSync(VERSION_CACHE, JSON.stringify({ remoteVersion: remote, checkedAt: ts() }), "utf-8");
         if (semverNewer(remote, local)) {
-            await sessionRef.log(`[preflight] v${remote} available (you have v${local}) — run: copilot plugin update preflight`, { level: "warning" });
+            await sessionRef.log(`[preflight] v${remote} available (you have v${local}) — run @preflight for a guided 1-click update`, { level: "warning" });
         }
     } catch {
         await sessionRef.log("[preflight] Could not check for plugin updates (network error)", { level: "info" });

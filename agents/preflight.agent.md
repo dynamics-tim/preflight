@@ -536,14 +536,40 @@ Run this step only if `plugin_outdated = true` OR `config_stale = true`. Otherwi
 
 **Scenario A — Plugin itself is outdated** (`plugin_outdated = true`):
 
-Show an inline banner (plain text, no `ask_user` needed):
+Use `ask_user` with a boolean to offer a one-click update:
 
-```
-⬆️  **preflight update available** — you're running v<CURRENT_PLUGIN_VERSION>, latest is v<latestVersion>.
-Run `copilot plugin install dynamics-tim/preflight` to get the latest features, then re-run `@preflight`.
+```json
+{
+  "message": "⬆️ **preflight update available** — you're running v<CURRENT_PLUGIN_VERSION>, latest is v<latestVersion>.\n\nWould you like me to run the update now? I'll execute `copilot plugin install dynamics-tim/preflight` for you.",
+  "requestedSchema": {
+    "properties": {
+      "update": {
+        "type": "boolean",
+        "title": "Update preflight now",
+        "description": "Runs `copilot plugin install dynamics-tim/preflight` automatically",
+        "default": true
+      }
+    },
+    "required": ["update"]
+  }
+}
 ```
 
-Do not block the workflow. Continue to Scenario B check or proceed to Phase 3 if neither applies.
+- If the user **accepts** (or declines the form without answering): run `copilot plugin install dynamics-tim/preflight` via the shell tool.
+  - **Success** (exit code 0 or no error output): Show this confirmation and **stop** — do not continue to Scenario B or Phase 3. The user is now on the latest version and should re-invoke `@preflight` to get all new features:
+    ```
+    ✅ preflight updated to v<latestVersion>. Re-run `@preflight` to continue with the latest features.
+    ```
+  - **Failure** (non-zero exit or error output): Surface the error briefly, fall back to the manual command, and continue the workflow normally:
+    ```
+    ⚠️ Auto-update failed. Run manually: `copilot plugin install dynamics-tim/preflight`, then re-run `@preflight`.
+    ```
+- If the user **declines** (explicitly chooses false): Show the manual command as a plain inline note and continue to Scenario B check or Phase 3:
+  ```
+  ⬆️ To update later: `copilot plugin install dynamics-tim/preflight`, then re-run `@preflight`.
+  ```
+
+> Note: if both `plugin_outdated = true` AND `config_stale = true`, a successful update stops the workflow (Scenario B is moot — it will be presented on the next run with the updated plugin). A declined or failed update proceeds to Scenario B normally.
 
 **Scenario B — Project configs were scaffolded by an older plugin version** (`config_stale = true`):
 
