@@ -4,12 +4,13 @@
 
 **preflight** is an open-source custom agent that scans your project, recommends a tailored Copilot configuration, and scaffolds all the files interactively. It bundles 1 agent, 5 skills, and optional extensions. Once installed, you describe what you want — the agent scans your codebase, recommends a tailored setup, and scaffolds everything interactively.
 
-> **Current version: 2.3.0** — [changelog](plugin-changelog.json)
+> **Current version: 2.4.0** — [changelog](plugin-changelog.json)
 
 ### What's New in v2.x
 
 | Version | Highlights |
 |---|---|
+| **2.4.0** | Agent authoring workshop — Category 4 replaced with interactive custom agent authoring; no more generic code-reviewer/test-writer/docs-writer menu |
 | **2.3.0** | Self-protecting guardrails — activation derives from boundaries file existence (not state flag), self-protection paths in all presets |
 | **2.2.0** | Plugin version check at session start (24h-cached, non-blocking) |
 | **2.1.0** | Guardrails UX — deny/ask messages include attempt descriptions for instant context |
@@ -124,7 +125,6 @@ You should see some or all of these (depending on what you confirmed):
 | `@preflight` (audit) | Validate existing config, detect stack drift, suggest improvements | When you already have config and want to check it |
 | `@preflight review last session` | Extract repeatable patterns from sessions into skills | After a few normal coding sessions — works from session store, no extension needed |
 | `@preflight tune-boundaries` | Tune guardrail policy from observed usage | After sessions with guardrails active — reads audit log and suggests rule adjustments |
-| `@code-reviewer` | Review code for bugs and security issues | Before pushing changes (if you created this agent during setup) |
 | `/instructions` | Verify active instruction files | Check what's loaded, diagnose unexpected suggestions |
 | `/agent` | Browse installed agents | Find agents by name or description |
 | `/skills list` | See active skills | Verify installed skills loaded correctly |
@@ -326,7 +326,8 @@ preflight/
 
 ## Roadmap
 
-- **v2.3.0 (current):** Self-protecting guardrails (tamper-resistant activation, self-protection paths in all presets), plugin version check at session start, guardrails UX improvements.
+- **v2.4.0 (current):** Agent authoring workshop — Category 4 replaced with interactive custom agent authoring; preflight no longer recommends generic agents but guides users through designing a purpose-built specialist for their workflow.
+- **v2.3.0:** Self-protecting guardrails (tamper-resistant activation, self-protection paths in all presets), plugin version check at session start, guardrails UX improvements.
 - **v2.0.0:** Agent Guardrails (`onPreToolUse` policy system, YAML boundary files, preset + stack profiles, `@preflight tune-boundaries`); hub-extension refactor (single `preflight-hub/extension.mjs`, fixes hook overwrite bug).
 - **v1.6.0:** Self-hosted marketplace for version-tracked updates, automated version sync workflow, scan results confirmation, user confirmation checkpoints, canonical `confirmedStack` data flow, parallelized scanning, agent consolidation (single agent + 5 skills), community skill discovery, plugin install, presets, audit mode, session learning, native command education.
 - **v3 (planned):** MCP config scaffolding, team-sharing workflows, stack affinity mapping.

@@ -1,6 +1,18 @@
 {
   "_comment": "Maps each plugin release to config improvements. Used by the preflight agent to surface targeted upgrade actions when a version bump is detected between the installed plugin and the version stored in .preflight-state.json.",
   "changelog": {
+    "2.4.0": {
+      "summary": "Agent authoring workshop — Category 4 replaced with interactive custom agent authoring. Preflight no longer recommends generic pre-built agents (code-reviewer, test-writer, docs-writer); instead it guides users through designing a purpose-built specialist agent for their own workflow.",
+      "configImpacts": [
+        {
+          "type": "improvement",
+          "title": "Custom agent authoring instead of generic agent menu",
+          "description": "The Category 4 setup step no longer offers a fixed menu of code-reviewer, test-writer, and docs-writer agents. These generic roles are better served by skills. Preflight now acts as an agent-authoring expert: it asks what repeating task or workflow pain point you have, then drafts a custom agent tailored to your stack and workflow. No existing configs are broken — this only changes what happens during a fresh @preflight setup run.",
+          "affectedFiles": [],
+          "recommendation": "No action needed for existing setups. If you want a custom agent, re-run @preflight — it will walk you through the authoring workshop."
+        }
+      ]
+    },
     "2.3.0": {
       "summary": "Self-protecting guardrails — activation derived from boundaries file existence, not state flag. Prevents AI from disabling enforcement by editing .preflight-state.json.",
       "configImpacts": [

@@ -183,7 +183,6 @@ Use `glob` to check for:
 
 - `.github/copilot-instructions.md`
 - `.github/instructions/*.instructions.md`
-- `.github/agents/*.agent.md`
 - `.github/skills/`
 - `.github/extensions/`
 - `.copilot/`
@@ -260,7 +259,7 @@ Store:
 On any read or parse error, set `leanCtxConfigured = false` and proceed silently. Never surface this check to the user.
 
 <!-- version-sync: plugin.json → keep CURRENT_PLUGIN_VERSION in sync via .github/workflows/sync-marketplace-version.yml -->
-The current installed version of preflight is **CURRENT_PLUGIN_VERSION = "2.3.0"**.
+The current installed version of preflight is **CURRENT_PLUGIN_VERSION = "2.4.0"**.
 
 Silently perform two checks:
 
@@ -307,7 +306,6 @@ src/, tests/, docs/, public/, scripts/
 ### 🔧 Existing Copilot Config
 - ✅ `.github/copilot-instructions.md` — exists
 - ❌ Path-specific instructions — none found (Copilot uses the same rules for every file type)
-- ❌ Custom agents — none found (no specialist personas available)
 - ❌ Hooks — none found (no session automation or learning)
 ```
 
@@ -794,17 +792,60 @@ If accepted, remove the misplaced section using the managed markers merge strate
 
 > 💡 **Note:** Commit instructions are wired via `.vscode/settings.json`, not an `applyTo` glob — they won't appear in the `/instructions` list, but they load automatically whenever Copilot generates a commit message.
 
-#### Category 4: Custom agents
+#### Category 4: Custom agent authoring
 
-Only recommend if there's a clear use case. Common recommendations:
+Preflight does not recommend generic pre-built agents — tasks like code review, test writing, and documentation are better handled by skills. Instead, this category helps the user **author a custom agent** tailored to a specific workflow challenge they face repeatedly.
 
-| Condition | Agent | Purpose |
-|---|---|---|
-| Tests + CI detected | `code-reviewer.agent.md` | Reviews PRs for correctness, test coverage, and style |
-| Test framework detected | `test-writer.agent.md` | Generates tests following project conventions |
-| docs/ directory exists | `docs-writer.agent.md` | Writes/updates documentation |
+Use `ask_user` to offer the authoring workshop:
 
-File location: `.github/agents/[name].agent.md`
+```json
+{
+  "message": "🤖 **Custom agent authoring** (`.github/agents/`)\n\nInstructions shape how Copilot writes code. **Agents** go further — they're specialist personas you invoke with `@agent-name`, like hiring an expert for a specific job.\n\n**Without an agent:** You re-explain the task and context every time you start.\n**With an agent:** The specialist already knows the job, your stack, and your conventions.\n\nPreflight doesn't generate generic agents (code-reviewer, test-writer) — those are better served by skills. Instead, I can help you design a custom agent built around a real pain point in *your* workflow.\n\n**Think about:** a task you find yourself re-explaining from scratch every time — a complex migration workflow, a domain-specific code pattern, an internal review process with lots of tribal knowledge. That's the perfect candidate.\n\nWould you like help authoring a custom agent now?",
+  "requestedSchema": {
+    "properties": {
+      "create": {
+        "type": "boolean",
+        "title": "Help me author a custom agent",
+        "description": "I'll ask what specialist you need, then help you design and scaffold a purpose-built agent",
+        "default": false
+      }
+    },
+    "required": ["create"]
+  }
+}
+```
+
+If the user accepts, use `ask_user` to gather the agent's purpose:
+
+```json
+{
+  "message": "🎯 **What specialist do you need?**\n\nDescribe the task or workflow this agent will own. Think of it as writing a job description for an expert who already knows your stack.\n\nExamples for a <confirmedStack.framework.name> + <confirmedStack.languages> project:\n- *\"A database migration reviewer that checks for N+1 queries and missing indices in schema changes\"*\n- *\"An onboarding guide for our internal event-sourcing patterns — knows our aggregate structure and command conventions\"*\n- *\"A release checklist agent for deploys — checks image tags, resource limits, and rollout strategy\"*\n\nBe as specific as possible. The more concrete the task, the more useful the agent.",
+  "requestedSchema": {
+    "properties": {
+      "purpose": {
+        "type": "string",
+        "title": "Agent purpose",
+        "description": "What task or workflow will this agent own? Describe the concrete problem, not a generic role."
+      },
+      "name": {
+        "type": "string",
+        "title": "Agent name (optional)",
+        "description": "Short kebab-case name for @invocation (e.g. migration-reviewer, deploy-checklist). Leave blank and I'll suggest one."
+      }
+    },
+    "required": ["purpose"]
+  }
+}
+```
+
+Based on the user's `purpose` and `confirmedStack`, draft a custom `.github/agents/<name>.agent.md` file:
+
+- **Identity** — A focused description of what the specialist knows and does. Reference the user's exact workflow, not a generic role.
+- **Behaviors** — 5–10 specific rules derived from the user's description and detected stack conventions. Every rule should be concrete and project-specific.
+- **Tools** — Minimal required set. Only include tools the described workflow actually needs.
+- **Stack context** — Weave in concrete stack details from `confirmedStack` (languages, framework, test tooling, confirmed patterns) so the agent doesn't require re-explanation.
+
+Present the draft inline before scaffolding. If the user requests changes, revise before writing the file.
 
 Each agent MUST have YAML frontmatter:
 ```yaml
@@ -816,41 +857,15 @@ tools:
 ---
 ```
 
-Use `ask_user` with a multi-select array. In the `message` field, include a brief content outline for each recommended agent — what it will contain (identity, key behaviors, tools, stack references from `confirmedStack`) — so the user understands what they're approving:
+**Post-generation review (mandatory):** After scaffolding, perform a focused review pass:
 
-```json
-{
-  "message": "🤖 **Custom agents** (`.github/agents/`)\n\nInstructions shape how Copilot writes code. **Agents** go further — they're specialist personas you invoke with `@agent-name`, like hiring an expert for a specific job.\n\n**Without agents:** You explain the task and context every time.\n**With agents:** The specialist already knows the job and your conventions.\n\nBased on your project, here's what each agent would contain:\n\n**@code-reviewer** — Reviews PRs using <test framework>, checks <CI tool> integration, enforces <detected conventions>\n**@test-writer** — Generates <test framework> tests following your <naming convention> patterns in `<test directory>`\n\nSelect which to create:",
-  "requestedSchema": {
-    "properties": {
-      "agents": {
-        "type": "array",
-        "title": "Select which agents to create",
-        "description": "Each agent is a specialist persona you invoke with @agent-name in Copilot chat",
-        "items": {
-          "type": "string",
-          "enum": ["code-reviewer — Reviews PRs for correctness, coverage, and style (@code-reviewer)", "test-writer — Generates tests following project conventions (@test-writer)"]
-        },
-        "default": ["code-reviewer — Reviews PRs for correctness, coverage, and style (@code-reviewer)", "test-writer — Generates tests following project conventions (@test-writer)"]
-      }
-    }
-  }
-}
-```
+1. **Purpose alignment** — Verify the agent content accurately reflects what the user described. If any rule or behavior drifted toward a generic role rather than the user's specific task, revise it.
+2. **Stack reference check** — Cross-check any directory paths, class names, or file references in the agent against what Phase 1 and the deep scan actually found. Remove or correct anything not confirmed by the scan.
+3. **Surface the verdict inline** — Output one of:
+   - `✅ Agent content verified against user intent and confirmedStack — no adjustments needed.`
+   - `⚠️ Adjusted: replaced [generic assumption] with [user-described pattern] based on their workflow description.`
 
-Adapt the `enum` and `default` arrays to only include agents relevant to the project's detected capabilities.
-
-**Post-generation review (mandatory for every agent created):** Immediately after scaffolding each agent file, perform a focused review pass against `confirmedStack` and `confirmedPatterns` before moving to the next category:
-
-1. **Injection/testing pattern check** — If the deep scan found a custom injection framework (e.g., `ServiceLocator.Substitute<T>()`, a custom `FakeHttpService`, or a non-standard mock pattern), verify the generated agent references it correctly. If the agent uses a framework default (e.g., `new Mock<T>()`, `WithFakeMessageExecutor`) that the deep scan did NOT confirm, replace it with the detected pattern.
-2. **Structure reference check** — Cross-check any directory paths, class names, or file references in the agent against what Phase 1 and the deep scan actually found. Remove or correct anything not confirmed by the scan.
-3. **Surface the verdict inline** — After the review, output one of:
-   - `✅ Agent content verified against confirmedStack — no adjustments needed.`
-   - `⚠️ Adjusted: replaced [wrong assumption] with [correct pattern] based on confirmedPatterns.`
-
-This step exists because generated agents use framework defaults that are wrong for projects with custom test infrastructure. Never skip it.
-
-> 💡 **Manage with:** `/agent` in Copilot chat to browse installed agents; invoke any agent with `@agent-name` in any prompt. To update an agent, edit its `.agent.md` file directly — changes take effect immediately.
+> 💡 **Manage with:** `/agent` in Copilot chat to browse installed agents; invoke your agent with `@agent-name` in any prompt. To update the agent, edit its `.agent.md` file directly — changes take effect immediately. To author more agents later, run `@preflight` and it will offer this same authoring workshop.
 
 #### Category 5: Session learning
 
@@ -1175,7 +1190,7 @@ Create files in **dependency groups** — all files within a group can be create
 |---|---|---|
 | **1** | Repo-wide instructions + all path-specific instruction files | Independent of each other |
 | **2** | Commit instructions + `.vscode/settings.json` | Coupled — settings wire the instruction file |
-| **3** | Each custom agent file | Independent of each other, but each requires an immediate post-generation review (see Category 4) before the next group |
+| **3** | User-authored agent file (if Category 4 accepted) | Requires post-generation review before next group |
 | **4** | `.github/extensions/preflight-hub/extension.mjs` (written once using all accepted `hubFeatures` flags, read template from `skills/preflight-hooks/templates/extension.mjs`) + `.github/preflight-boundaries.yaml` (if guardrails accepted) + `.gitignore` update (`.copilot/` entry if session-logger or session features enabled) | Independent of each other; hub written once from collected flags |
 | **5 (last)** | `.preflight-state.json` | Depends on all above — needs final `managedFiles` list, `hubFeatures`, `boundaries` |
 
@@ -1197,7 +1212,7 @@ After all files are created, create or update `.github/.preflight-state.json`:
 ```json
 {
   "version": "1.0.0",
-  "pluginVersion": "2.0.0",
+  "pluginVersion": "2.4.0",
   "lastRun": "<ISO 8601 timestamp>",
   "confirmedStack": {
     "languages": ["typescript"],
@@ -1233,7 +1248,7 @@ After all files are created, create or update `.github/.preflight-state.json`:
 }
 ```
 
-- `pluginVersion` — always set to `CURRENT_PLUGIN_VERSION` ("2.0.0"). This is what future runs compare against to detect version drift and surface config improvements from newer plugin releases.
+- `pluginVersion` — always set to `CURRENT_PLUGIN_VERSION`. This is what future runs compare against to detect version drift and surface config improvements from newer plugin releases.
 - `confirmedStack` — the user-confirmed stack from step 2a-confirm (replaces the old `detectedStack`). Future audit runs compare against this to detect drift.
 - `hubFeatures` — which behaviors are active in the preflight-hub extension. Set only the flags for categories the user confirmed (others default to `false`). `versionCheck` defaults to `true` when config-freshness is accepted (it shares the same session-start concern). Include in state even if all are false, so future runs can read the state.
 - `boundaries` — populated only when guardrails was accepted (Cat 6). Omit if guardrails was declined.
@@ -1252,7 +1267,7 @@ Present a capability-focused summary that teaches the user what Copilot now know
 | Your project is [framework] + [language] + [package manager] | Repo-wide instructions | `.github/copilot-instructions.md` | `/instructions` |
 | [Language] files should use [detected conventions] | Path-scoped rules (only loads for [extension] files) | `.github/instructions/[lang].instructions.md` | `/instructions` |
 | Tests use [framework] and live in [test dir] | Path-scoped rules (only loads for test files) | `.github/instructions/tests.instructions.md` | `/instructions` |
-| @code-reviewer can review your PRs | Custom agent persona | `.github/agents/code-reviewer.agent.md` | `/agent` · `@code-reviewer` |
+| [Your custom agent] owns [described workflow] | Custom agent persona (user-authored in Category 4) | `.github/agents/<name>.agent.md` | `/agent` · `@<name>` |
 | Tool calls intercepted by policy | onPreToolUse boundary system | `.github/preflight-boundaries.yaml` | `@preflight tune-boundaries` |
 | Community skills installed | `gh skill` | `~/.copilot/skills/` | `gh skill list` |
 | Lower token usage for reads and shell output | lean-ctx compresses tool context before it reaches Copilot | `~/.copilot/mcp-config.json` | `lean-ctx doctor` |
@@ -1267,7 +1282,7 @@ it reads your repo-wide rules + TypeScript rules + test rules — all together, 
 ### Next Steps
 1. Review and tweak the generated files — they're yours to customize
 2. Commit `.github/` — your whole team benefits immediately
-3. Try `@code-reviewer` (or whichever agents were created) on your next task
+3. If you created a custom agent, try `@<agent-name>` on your next relevant task
 4. Re-run `@preflight` anytime your stack changes — it's idempotent
 5. After sessions with significant code changes, run `@preflight audit` to keep instruction files aligned with your codebase
 
@@ -1289,7 +1304,7 @@ it reads your repo-wide rules + TypeScript rules + test rules — all together, 
 > **Tip:** All agents are invoked with `@name` in Copilot chat. Instructions and skills load automatically — no invocation needed.
 ```
 
-Adapt the table rows to match exactly what was created. Only include rows for files that were actually generated. Use `confirmedStack` values throughout. Include the community skills row only if any community skills were installed in step 2.5. Include the lean-ctx row only if `leanCtxInstalled = true`. In the "What's Available Now" table, replace the `@<agent-name>` placeholder rows with one row per agent that was actually created — use the agent's name and description from its YAML frontmatter.
+Adapt the table rows to match exactly what was created. Only include rows for files that were actually generated. Use `confirmedStack` values throughout. Include the community skills row only if any community skills were installed in step 2.5. Include the lean-ctx row only if `leanCtxInstalled = true`. If the user authored a custom agent in Category 4, replace the `[Your custom agent]` placeholder row with one row using the agent's actual name and a one-line description of the workflow it owns (from their Category 4 purpose answer). Omit the agent row entirely if Category 4 was skipped or declined.
 
 #### 4e. Optional architecture tour
 
@@ -1451,7 +1466,7 @@ Structure: YAML frontmatter (`name`, `description`, `tools`) → identity paragr
 
 Every generated agent MUST include in its behavioral rules:
 - "Ask the user before making assumptions about <agent-domain-specific decisions>. Present options with tradeoffs when multiple valid approaches exist."
-Adapt the domain-specific decisions to the agent's purpose (e.g., a code-reviewer agent should ask about review severity thresholds; a test-writer agent should ask about test scope and mocking strategy).
+Adapt the domain-specific decisions to the agent's purpose (e.g., a migration-reviewer agent should ask about which schema changes are in scope; a deploy-checklist agent should ask about target environment and rollback policy).
 
 ### Content quality rules (apply to ALL generated files)
 
