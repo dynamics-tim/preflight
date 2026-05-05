@@ -4,12 +4,13 @@
 
 **preflight** is an open-source custom agent that scans your project, recommends a tailored Copilot configuration, and scaffolds all the files interactively. It bundles 1 agent, 5 skills, and optional extensions. Once installed, you describe what you want — the agent scans your codebase, recommends a tailored setup, and scaffolds everything interactively.
 
-> **Current version: 2.4.0** — [changelog](plugin-changelog.json)
+> **Current version: 2.5.0** — [changelog](plugin-changelog.json)
 
 ### What's New in v2.x
 
 | Version | Highlights |
 |---|---|
+| **2.5.0** | Guided 1-click update — `@preflight` now runs the plugin install command for you when an update is detected; fixed extension versionCheck message |
 | **2.4.0** | Agent authoring workshop — Category 4 replaced with interactive custom agent authoring; no more generic code-reviewer/test-writer/docs-writer menu |
 | **2.3.0** | Self-protecting guardrails — activation derives from boundaries file existence (not state flag), self-protection paths in all presets |
 | **2.2.0** | Plugin version check at session start (24h-cached, non-blocking) |

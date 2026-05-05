@@ -1,6 +1,18 @@
 {
   "_comment": "Maps each plugin release to config improvements. Used by the preflight agent to surface targeted upgrade actions when a version bump is detected between the installed plugin and the version stored in .preflight-state.json.",
   "changelog": {
+    "2.5.0": {
+      "summary": "Guided 1-click update flow — @preflight now offers to run the plugin install command automatically when an update is detected, replacing the passive banner. Extension versionCheck message corrected to direct users to @preflight.",
+      "configImpacts": [
+        {
+          "type": "improvement",
+          "title": "Corrected plugin update message in extension",
+          "description": "The versionCheck log message in the preflight-hub extension previously showed the wrong update command (`copilot plugin update preflight`). It now reads: \"run @preflight for a guided 1-click update\". This connects the session-start nudge to the new guided update flow in the agent.",
+          "affectedFiles": [".github/extensions/preflight-hub/extension.mjs"],
+          "recommendation": "Re-run @preflight or copy the updated extension template to get the corrected message."
+        }
+      ]
+    },
     "2.4.0": {
       "summary": "Agent authoring workshop — Category 4 replaced with interactive custom agent authoring. Preflight no longer recommends generic pre-built agents (code-reviewer, test-writer, docs-writer); instead it guides users through designing a purpose-built specialist agent for their own workflow.",
       "configImpacts": [
