@@ -1,9 +1,9 @@
 {
   "version": "1.0.0",
-  "pluginVersion": "2.0.0",
-  "lastRun": "2026-04-29T00:00:00Z",
+  "pluginVersion": "2.4.0",
+  "lastRun": "2026-05-05T10:41:24Z",
   "confirmedStack": {
-    "languages": ["markdown", "bash", "powershell", "javascript", "json"],
+    "languages": ["markdown", "bash", "powershell", "javascript", "yaml", "json"],
     "framework": null,
     "packageManager": null,
     "testFramework": null,
